@@ -4,18 +4,50 @@ const { requireAuth, requireProfe, requireTutor } = require('../middleware/auth'
 
 const router = express.Router();
 
-// GET /api/alumnado — includes estancias nested with seguimientos count
+// GET /api/alumnado — incluye estancias anidadas con conteo de seguimientos (una sola query)
 router.get('/', requireAuth, (req, res) => {
-  const alumnos = db.prepare(`SELECT * FROM alumnado WHERE deleted = 0 ORDER BY apellidos, nombre`).all();
-  const estancias = db.prepare(`SELECT e.*,
-    (SELECT COUNT(*) FROM seguimientos s WHERE s.estancia_id=e.id AND s.deleted=0) as num_seguimientos,
-    (SELECT COUNT(*) FROM seguimientos s WHERE s.estancia_id=e.id AND s.deleted=0 AND s.pendiente=1) as num_pendientes_validacion
-    FROM estancias e WHERE e.deleted = 0 ORDER BY e.curso DESC`).all();
-  const data = alumnos.map(a => ({
-    ...a,
-    estancias: estancias.filter(e => e.alumno_id === a.id)
-  }));
-  res.json({ alumnado: data });
+  const rows = db.prepare(`
+    SELECT
+      a.id, a.apellidos, a.nombre, a.dni, a.familia, a.deleted, a.created_at, a.updated_at,
+      json_group_array(
+        CASE WHEN e.id IS NULL THEN NULL ELSE json_object(
+          'id',                        e.id,
+          'alumno_id',                 e.alumno_id,
+          'empresa_id',                e.empresa_id,
+          'empresa_nombre',            e.empresa_nombre,
+          'empresa_cif',               e.empresa_cif,
+          'curso',                     e.curso,
+          'nivel',                     e.nivel,
+          'periodo_ini',               e.periodo_ini,
+          'periodo_fin',               e.periodo_fin,
+          'contacto',                  e.contacto,
+          'obs_empresa',               e.obs_empresa,
+          'obs_alumno',                e.obs_alumno,
+          'calificacion',              e.calificacion,
+          'supervisor_id',             e.supervisor_id,
+          'supervisor_nombre',         e.supervisor_nombre,
+          'deleted',                   e.deleted,
+          'delete_pending',            e.delete_pending,
+          'created_at',                e.created_at,
+          'updated_at',                e.updated_at,
+          'num_seguimientos',          (SELECT COUNT(*) FROM seguimientos s WHERE s.estancia_id = e.id AND s.deleted = 0),
+          'num_pendientes_validacion', (SELECT COUNT(*) FROM seguimientos s WHERE s.estancia_id = e.id AND s.deleted = 0 AND s.pendiente = 1)
+        ) END
+      ) AS estancias_json
+    FROM alumnado a
+    LEFT JOIN estancias e ON e.alumno_id = a.id AND e.deleted = 0
+    WHERE a.deleted = 0
+    GROUP BY a.id
+    ORDER BY a.apellidos, a.nombre
+  `).all();
+
+  const alumnado = rows.map(row => {
+    const estancias = JSON.parse(row.estancias_json).filter(Boolean);
+    const { estancias_json, ...alumno } = row;
+    return { ...alumno, estancias };
+  });
+
+  res.json({ alumnado });
 });
 
 // POST /api/alumnado — upsert por DNI

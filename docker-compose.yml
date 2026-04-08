@@ -22,9 +22,9 @@ services:
     restart: unless-stopped
     volumes:
       - ./data:/app/data
+    env_file:
+      - .env
     environment:
-      - JWT_SECRET=cambia_este_secreto_en_produccion
-      - ADMIN_PASSWORD=admin1234
       - PORT=3001
       - NODE_ENV=production
     expose:

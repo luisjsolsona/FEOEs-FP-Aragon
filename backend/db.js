@@ -1,6 +1,7 @@
 const Database = require('better-sqlite3');
 const bcrypt   = require('bcryptjs');
 const path     = require('path');
+const logger   = require('./utils/logger');
 
 const DB_PATH = path.join('/app/data', 'feoe.sqlite');
 const db = new Database(DB_PATH);
@@ -74,13 +75,19 @@ db.exec(`
     tipo TEXT NOT NULL, texto TEXT NOT NULL, usuario TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
-  CREATE INDEX IF NOT EXISTS idx_estancias_alumno    ON estancias(alumno_id);
-  CREATE INDEX IF NOT EXISTS idx_estancias_empresa   ON estancias(empresa_id);
-  CREATE INDEX IF NOT EXISTS idx_estancias_curso     ON estancias(curso);
-  CREATE INDEX IF NOT EXISTS idx_seguimientos_est    ON seguimientos(estancia_id);
-  CREATE INDEX IF NOT EXISTS idx_seguimientos_alumno ON seguimientos(alumno_id);
-  CREATE INDEX IF NOT EXISTS idx_alumnado_dni        ON alumnado(dni);
-  CREATE INDEX IF NOT EXISTS idx_empresas_cif        ON empresas(cif);
+  CREATE INDEX IF NOT EXISTS idx_estancias_alumno        ON estancias(alumno_id);
+  CREATE INDEX IF NOT EXISTS idx_estancias_empresa       ON estancias(empresa_id);
+  CREATE INDEX IF NOT EXISTS idx_estancias_curso         ON estancias(curso);
+  CREATE INDEX IF NOT EXISTS idx_estancias_deleted       ON estancias(deleted);
+  CREATE INDEX IF NOT EXISTS idx_estancias_delete_pend   ON estancias(delete_pending);
+  CREATE INDEX IF NOT EXISTS idx_seguimientos_est        ON seguimientos(estancia_id);
+  CREATE INDEX IF NOT EXISTS idx_seguimientos_alumno     ON seguimientos(alumno_id);
+  CREATE INDEX IF NOT EXISTS idx_seguimientos_deleted    ON seguimientos(deleted);
+  CREATE INDEX IF NOT EXISTS idx_seguimientos_pendiente  ON seguimientos(pendiente);
+  CREATE INDEX IF NOT EXISTS idx_alumnado_dni            ON alumnado(dni);
+  CREATE INDEX IF NOT EXISTS idx_alumnado_deleted        ON alumnado(deleted);
+  CREATE INDEX IF NOT EXISTS idx_empresas_cif            ON empresas(cif);
+  CREATE INDEX IF NOT EXISTS idx_empresas_deleted        ON empresas(deleted);
 `);
 
 // Migraciones para BDs existentes
@@ -89,14 +96,17 @@ const migs = [
   `ALTER TABLE estancias ADD COLUMN supervisor_id INTEGER`,
   `ALTER TABLE estancias ADD COLUMN supervisor_nombre TEXT`,
 ];
-for (const sql of migs) { try { db.exec(sql); } catch {} }
+for (const sql of migs) {
+  try { db.exec(sql); }
+  catch (e) { if (!e.message.includes('duplicate column')) logger.warn('Migration skipped', { sql, error: e.message }); }
+}
 
 // Admin por defecto
 if (!db.prepare(`SELECT id FROM users WHERE role = 'admin' LIMIT 1`).get()) {
   const rawPassword = process.env.ADMIN_PASSWORD || 'admin1234';
   db.prepare(`INSERT INTO users (username, password_hash, role, nombre) VALUES ('admin', ?, 'admin', 'Administrador')`)
     .run(bcrypt.hashSync(rawPassword, 12));
-  console.log('[DB] Admin creado. Contrasena:', rawPassword);
+  logger.info('[DB] Usuario admin creado con contrasena hasheada.');
 }
 
 module.exports = db;

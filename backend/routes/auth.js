@@ -1,13 +1,14 @@
-const express = require('express');
-const bcrypt  = require('bcryptjs');
-const jwt     = require('jsonwebtoken');
-const db      = require('../db');
-const { requireAuth } = require('../middleware/auth');
+const express      = require('express');
+const bcrypt       = require('bcryptjs');
+const jwt          = require('jsonwebtoken');
+const db           = require('../db');
+const { requireAuth }   = require('../middleware/auth');
+const { loginLimiter }  = require('../middleware/rateLimiter');
 
 const router = express.Router();
 const SECRET = process.env.JWT_SECRET || 'secreto_por_defecto_cambiar';
 
-router.post('/login', (req, res) => {
+router.post('/login', loginLimiter, (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) return res.status(400).json({ error: 'Usuario y contrasena son obligatorios.' });
   const user = db.prepare(`SELECT * FROM users WHERE username = ? AND activo = 1`).get(username);

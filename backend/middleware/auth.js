@@ -1,4 +1,5 @@
-const jwt = require('jsonwebtoken');
+const jwt    = require('jsonwebtoken');
+const logger = require('../utils/logger');
 const SECRET = process.env.JWT_SECRET || 'secreto_por_defecto_cambiar';
 
 // Jerarquía de roles: admin > tutor > profe > invitado
@@ -11,7 +12,8 @@ function requireAuth(req, res, next) {
     const payload = jwt.verify(token, SECRET);
     req.user = { id: payload.userId, role: payload.role, nombre: payload.nombre };
     next();
-  } catch {
+  } catch (e) {
+    logger.warn('JWT inválido', { type: e.name, msg: e.message });
     return res.status(401).json({ error: 'Sesion expirada.' });
   }
 }

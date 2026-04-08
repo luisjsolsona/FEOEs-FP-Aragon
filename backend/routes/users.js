@@ -47,8 +47,8 @@ router.delete('/:id', requireAdmin, (req, res) => {
 router.put('/:id/password', requireAuth, (req, res) => {
   const id = parseInt(req.params.id);
   const { currentPassword, newPassword } = req.body;
-  if (!newPassword || newPassword.length < 6)
-    return res.status(400).json({ error: 'La nueva contrasena debe tener al menos 6 caracteres.' });
+  if (!newPassword || newPassword.length < 10)
+    return res.status(400).json({ error: 'La nueva contrasena debe tener al menos 10 caracteres.' });
   const target = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
   if (!target) return res.status(404).json({ error: 'Usuario no encontrado.' });
   if (req.user.role !== 'admin') {
