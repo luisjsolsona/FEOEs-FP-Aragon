@@ -16,11 +16,11 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
 app.use(securityHeaders);
 app.use(express.json({ limit: '10mb' }));
 app.use(cookieParser());
+// Detrás de Nginx, el navegador siempre accede por el mismo origen.
+// Solo añadimos cabeceras CORS para orígenes conocidos; los demás se ignoran
+// (sin lanzar error, para no generar 500 cuando Chrome envía Origin en POST same-origin).
 app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
-    return callback(new Error('CORS not allowed'));
-  },
+  origin: (origin, callback) => callback(null, !origin || allowedOrigins.includes(origin)),
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type'],
