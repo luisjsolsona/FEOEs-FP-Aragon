@@ -1,0 +1,45 @@
+# =============================================================
+# docker-compose.yml — FEOE FP Aragón
+#
+# Servicios:
+#   - backend:  API REST Express + SQLite (puerto interno 3001)
+#   - frontend: Nginx sirve el HTML y hace proxy a la API
+#
+# Uso:
+#   Arrancar:   docker-compose up -d
+#   Detener:    docker-compose down
+#   Logs:       docker-compose logs -f
+#   Rebuild:    docker-compose up -d --build
+#
+# La carpeta ./data persiste la BD SQLite fuera del contenedor.
+# =============================================================
+
+services:
+
+  backend:
+    build: ./backend
+    container_name: feoe_backend
+    restart: unless-stopped
+    volumes:
+      - ./data:/app/data
+    environment:
+      - JWT_SECRET=cambia_este_secreto_en_produccion
+      - ADMIN_PASSWORD=admin1234
+      - PORT=3001
+      - NODE_ENV=production
+    expose:
+      - "3001"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  frontend:
+    build: ./frontend
+    container_name: feoe_frontend
+    restart: unless-stopped
+    ports:
+      - "5000:80"
+    depends_on:
+      - backend

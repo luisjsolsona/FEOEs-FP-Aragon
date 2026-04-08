@@ -1,0 +1,3691 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FEOE — Gestión FP Aragón</title>
+<link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+// =============================================================
+// api.js — Cliente API REST FEOE FP Aragón
+// =============================================================
+
+window.apiFetch = async function apiFetch(path, options = {}) {
+  const res = await fetch('/api' + path, {
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+    ...options,
+    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json.error || `Error ${res.status}`);
+  return json;
+}
+
+const Auth = {
+  login:  (username, password) => window.apiFetch('/auth/login',  { method: 'POST', body: { username, password } }),
+  logout: ()                   => window.apiFetch('/auth/logout', { method: 'POST' }),
+  me:     ()                   => window.apiFetch('/auth/me'),
+};
+
+const Users = {
+  list:           ()       => window.apiFetch('/users'),
+  create:         (body)   => window.apiFetch('/users',              { method: 'POST',   body }),
+  update:         (id, b)  => window.apiFetch(`/users/${id}`,        { method: 'PUT',    body: b }),
+  delete:         (id)     => window.apiFetch(`/users/${id}`,        { method: 'DELETE' }),
+  changePassword: (id, b)  => window.apiFetch(`/users/${id}/password`,{ method: 'PUT',   body: b }),
+};
+
+const Empresas = {
+  list:   ()       => window.apiFetch('/empresas'),
+  create: (body)   => window.apiFetch('/empresas',       { method: 'POST',   body }),
+  update: (id, b)  => window.apiFetch(`/empresas/${id}`, { method: 'PUT',    body: b }),
+  delete: (id)     => window.apiFetch(`/empresas/${id}`, { method: 'DELETE' }),
+};
+
+const Alumnado = {
+  list:       ()       => window.apiFetch('/alumnado'),
+  create:     (body)   => window.apiFetch('/alumnado',            { method: 'POST',   body }),
+  update:     (id, b)  => window.apiFetch(`/alumnado/${id}`,      { method: 'PUT',    body: b }),
+  delete:     (id)     => window.apiFetch(`/alumnado/${id}`,      { method: 'DELETE' }),
+  bulkDelete: (ids)    => window.apiFetch('/alumnado/bulk-delete', { method: 'POST',   body: { ids } }),
+};
+
+const Estancias = {
+  create: (body)   => window.apiFetch('/estancias',       { method: 'POST',   body }),
+  update: (id, b)  => window.apiFetch(`/estancias/${id}`, { method: 'PUT',    body: b }),
+  delete: (id)     => window.apiFetch(`/estancias/${id}`, { method: 'DELETE' }),
+};
+
+const Pendientes = {
+  list:     ()           => window.apiFetch('/pendientes'),
+  create:   (body)       => window.apiFetch('/pendientes',                    { method: 'POST', body }),
+  resolver: (id, aprobar)=> window.apiFetch(`/pendientes/${id}/resolver`,    { method: 'PUT',  body: { aprobar } }),
+};
+
+const Historial = {
+  list:   (limit = 200) => window.apiFetch('/historial?limit='+limit),
+  create: (tipo, texto) => window.apiFetch('/historial', { method: 'POST', body: { tipo, texto } }),
+};
+
+const Seguimientos = {
+  list:    (params={}) => { const q=Object.entries(params).map(([k,v])=>k+'='+encodeURIComponent(v)).join('&'); return window.apiFetch('/seguimientos'+(q?'?'+q:'')); },
+  visitas: (params={}) => { const q=Object.entries(params).map(([k,v])=>k+'='+encodeURIComponent(v)).join('&'); return window.apiFetch('/seguimientos/visitas'+(q?'?'+q:'')); },
+  create:  (body)  => window.apiFetch('/seguimientos',               { method:'POST',   body }),
+  update:  (id, b) => window.apiFetch('/seguimientos/'+id,           { method:'PUT',    body:b }),
+  validar: (id)    => window.apiFetch('/seguimientos/'+id+'/validar', { method:'PUT',    body:{} }),
+  delete:  (id)    => window.apiFetch('/seguimientos/'+id,           { method:'DELETE' }),
+};
+</script>
+<script>
+window.addEventListener('error', function(e) {
+  console.error('[FEOE Error]', e.message, 'at', e.filename, 'L'+e.lineno);
+  const t = document.getElementById('toast');
+  const m = document.getElementById('toastMsg');
+  if (t && m) {
+    m.textContent = 'Error JS: ' + e.message;
+    t.className = 'show error';
+    setTimeout(() => t.classList.remove('show'), 6000);
+  }
+});
+window.addEventListener('unhandledrejection', function(e) {
+  console.error('[FEOE Promise]', e.reason);
+});
+</script>
+
+<style>
+  :root {
+    /* Paleta programaciones-fp */
+    --az:       #1a2744;   /* navy  */
+    --az2:      #243358;   /* navy-light */
+    --az-light: #eef4ff;   /* locked-bg */
+    --az-mid:   #b8c8ff;   /* locked-border */
+    --gold:     #c8a84b;
+    --gold-light:#e8c97a;
+    --red:      #8b1a1a;
+    --red-light:#fff0f0;
+    --green:    #2d6a4f;
+    --green-light:#edfbf2;
+    --gray1:    #2a2a2a;
+    --gray2:    #3a3a3a;
+    --gray3:    #6b6b6b;
+    --gray4:    #a0a0a0;
+    --gray5:    #d4cfc4;
+    --gray6:    #efe9da;
+    --gray7:    #f8f6f0;
+    --white:    #ffffff;
+    --border:   1px solid #d4cfc4;
+    --radius:   6px;
+    --shadow:   0 2px 16px rgba(26,39,68,0.10);
+    --shadow-lg:0 8px 40px rgba(26,39,68,0.16);
+    --font:     'DM Sans', sans-serif;
+    --mono:     'DM Sans', monospace;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 14px; }
+  body { font-family: var(--font); background: var(--gray7); color: var(--gray1); min-height: 100vh; font-size: 14px; }
+
+  /* ── HEADER ── */
+  header {
+    background: var(--az);
+    color: white;
+    padding: 0 32px;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky; top: 0; z-index: 100;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.25);
+  }
+  .header-left { display: flex; align-items: center; gap: 14px; }
+  .logo-badge {
+    background: var(--gold);
+    color: var(--az);
+    font-family: 'Crimson Pro', serif;
+    font-weight: 700;
+    font-size: 16px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    letter-spacing: 0.02em;
+  }
+  header h1 {
+    font-family: 'Crimson Pro', serif;
+    font-size: 20px; font-weight: 600; letter-spacing: 0.02em;
+  }
+  header h1 small { font-size: 13px; opacity: 0.65; margin-left: 8px; font-weight: 300; font-family: 'DM Sans', sans-serif; }
+  .user-info { display: flex; align-items: center; gap: 10px; font-size: 12px; }
+  .role-badge {
+    background: rgba(255,255,255,0.15);
+    border: 1.5px solid rgba(255,255,255,0.25);
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+  }
+  .role-badge.admin { background: rgba(200,168,75,0.25); border-color: rgba(200,168,75,0.5); color: var(--gold-light); }
+
+  /* ── NAV TABS ── */
+  nav {
+    background: var(--az2);
+    border-bottom: 2px solid var(--gold);
+    padding: 0 32px;
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+  }
+  .tab {
+    padding: 12px 22px;
+    font-size: 13px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.55);
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+    transition: all 0.15s;
+    display: flex; align-items: center; gap: 7px;
+    user-select: none;
+    background: none; border-top: none; border-left: none; border-right: none;
+  }
+  .tab:hover { color: rgba(255,255,255,0.85); }
+  .tab.active { color: var(--gold); border-bottom-color: var(--gold); }
+  .tab .count {
+    background: rgba(255,255,255,0.15);
+    color: rgba(255,255,255,0.8);
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 10px;
+  }
+  .tab.active .count { background: var(--gold); color: var(--az); }
+
+  /* ── LAYOUT ── */
+  main { padding: 24px 32px; max-width: 1400px; margin: 0 auto; }
+
+  /* ── TOOLBAR ── */
+  .toolbar {
+    background: var(--white);
+    border: 1px solid var(--gray5);
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin-bottom: 16px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+    box-shadow: var(--shadow);
+  }
+  .search-wrap {
+    flex: 1; min-width: 220px;
+    position: relative;
+  }
+  .search-wrap svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); opacity: 0.4; }
+  .search-wrap input {
+    width: 100%;
+    padding: 8px 10px 8px 32px;
+    border: var(--border);
+    border-radius: var(--radius);
+    font-family: var(--font);
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .search-wrap input:focus { border-color: var(--az2); box-shadow: 0 0 0 3px var(--az-light); }
+  select, input[type="text"], input[type="date"], textarea {
+    font-family: var(--font);
+    font-size: 13px;
+  }
+  .filter-select {
+    padding: 8px 12px;
+    border: 1.5px solid var(--gray5);
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: var(--font);
+    outline: none;
+    background: var(--white);
+    cursor: pointer;
+    min-width: 130px;
+    color: var(--gray1);
+  }
+  .filter-select:focus { border-color: var(--az); }
+
+  /* ── BOTONES ── */
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-family: var(--font);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+    text-decoration: none;
+  }
+  .btn-primary { background: var(--gold); color: var(--az); }
+  .btn-primary:hover { background: var(--gold-light); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(200,168,75,0.35); }
+  .btn-secondary { background: transparent; color: var(--az); border: 1.5px solid var(--az); }
+  .btn-secondary:hover { background: var(--az-light); border-color: var(--az); }
+  .btn-ghost { background: transparent; color: var(--gray3); border: 1.5px solid var(--gray5); }
+  .btn-ghost:hover { border-color: var(--az); color: var(--az); background: var(--gray7); }
+  .btn-danger { background: transparent; color: var(--red); border: 1.5px solid var(--red); }
+  .btn-danger:hover { background: var(--red-light); }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none !important; }
+
+  /* ── TABLA ── */
+  .table-wrap {
+    background: var(--white);
+    border: 1px solid var(--gray5);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  table { width: 100%; border-collapse: collapse; }
+  thead { background: var(--az); border-bottom: 2px solid var(--gold); }
+  th {
+    padding: 10px 12px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.75);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+    transition: color 0.15s;
+  }
+  th:hover { color: var(--gold-light); }
+  th.sorted { color: var(--gold); }
+  th .sort-arrow { opacity: 0.4; margin-left: 4px; }
+  th.sorted .sort-arrow { opacity: 1; }
+  td {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--gray6);
+    font-size: 13px;
+    vertical-align: middle;
+  }
+  tr:last-child td { border-bottom: none; }
+  tbody tr { transition: background 0.1s; }
+  tbody tr:hover { background: var(--az-light); }
+  tbody tr.deleted-row { opacity: 0.5; background: var(--red-light); }
+  tbody tr:nth-child(even) td { background: var(--gray7); }
+  tbody tr:nth-child(even):hover td { background: var(--az-light); }
+  .mono { font-family: monospace; font-size: 12px; }
+  .cell-empresa { font-weight: 600; color: var(--az); }
+  .cell-name { font-weight: 600; color: var(--gray1); }
+
+  /* ── BADGES ── */
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+    letter-spacing: 0.03em;
+  }
+  .badge-curso { background: var(--az); color: var(--gold); }
+  .badge-pend { background: rgba(200,168,75,0.15); color: #7a6000; border: 1px solid rgba(200,168,75,0.4); }
+  .badge-del { background: var(--red-light); color: var(--red); }
+  .badge-ok { background: var(--green-light); color: var(--green); }
+
+  /* ── MODAL EDICIÓN (centrado) ── */
+  .overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 200;
+    backdrop-filter: blur(3px);
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+  .overlay.open { display: flex; }
+  .panel {
+    background: var(--white);
+    width: 800px;
+    max-width: 100%;
+    max-height: 92vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(26,39,68,0.35);
+    display: flex; flex-direction: column;
+    border-radius: 12px;
+    animation: popIn 0.2s ease;
+  }
+  .panel-header {
+    padding: 20px 28px 16px;
+    border-bottom: 1px solid var(--gray5);
+    background: var(--az);
+    color: white;
+    display: flex; justify-content: space-between; align-items: flex-start;
+    border-radius: 12px 12px 0 0;
+    position: sticky; top: 0; z-index: 10;
+    flex-shrink: 0;
+  }
+  .panel-header h2 { font-family: 'Crimson Pro', serif; font-size: 20px; font-weight: 600; }
+  .panel-header small { font-size: 12px; opacity: 0.7; display: block; margin-top: 4px; font-family: 'DM Sans', sans-serif; }
+  .close-btn {
+    background: rgba(255,255,255,0.15);
+    border: none;
+    color: rgba(255,255,255,0.7);
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 18px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+    flex-shrink: 0;
+  }
+  .close-btn:hover { background: rgba(255,255,255,0.25); color: white; }
+  .panel-body { padding: 24px 28px; flex: 1; overflow-y: auto; }
+  .panel-footer {
+    padding: 16px 28px;
+    border-top: 1px solid var(--gray5);
+    display: flex; gap: 10px; justify-content: flex-end;
+    background: var(--gray7);
+    border-radius: 0 0 12px 12px;
+    position: sticky; bottom: 0; z-index: 10;
+    flex-shrink: 0;
+  }
+
+  /* ── FORMULARIO ── */
+  .form-section { margin-bottom: 20px; }
+  .form-section-title {
+    font-family: 'Crimson Pro', serif;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--az);
+    margin-bottom: 12px;
+    padding-bottom: 6px;
+    border-bottom: 2px solid var(--gold);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .form-row { display: grid; gap: 12px; margin-bottom: 12px; }
+  .form-row.col2 { grid-template-columns: 1fr 1fr; }
+  .form-row.col3 { grid-template-columns: 1fr 1fr 1fr; }
+  .form-row.col4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+  .form-group { display: flex; flex-direction: column; gap: 4px; }
+  .form-group label { font-size: 13px; font-weight: 600; color: var(--az); letter-spacing: 0.01em; }
+  .form-group input, .form-group select, .form-group textarea {
+    padding: 9px 12px;
+    border: 1.5px solid var(--gray5);
+    border-radius: 6px;
+    font-size: 14px;
+    font-family: var(--font);
+    outline: none;
+    transition: border-color 0.15s;
+    background: var(--white);
+    color: var(--gray1);
+  }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+    border-color: var(--az);
+  }
+  .form-group textarea { resize: vertical; min-height: 70px; }
+  .form-group input.error { border-color: var(--red); }
+  .form-hint { font-size: 11px; color: var(--gray3); margin-top: 2px; font-style: italic; }
+
+  /* ── EMPRESA CARD ── */
+  .empresa-card {
+    background: var(--white);
+    border: 1px solid var(--gray5);
+    border-radius: 10px;
+    margin-bottom: 12px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    transition: box-shadow 0.15s;
+  }
+  .empresa-card:hover { box-shadow: var(--shadow-lg); }
+  .empresa-card-header {
+    padding: 16px 20px;
+    background: var(--az);
+    border-bottom: 1px solid var(--gray5);
+    display: flex; justify-content: space-between; align-items: center;
+    cursor: pointer;
+  }
+  .empresa-card-header:hover { background: var(--az2); }
+  .empresa-name { font-family: 'Crimson Pro', serif; font-size: 17px; font-weight: 600; color: var(--white); }
+  .empresa-meta { font-size: 12px; color: rgba(255,255,255,0.65); margin-top: 2px; }
+  .empresa-card-body { padding: 0; }
+  .empresa-alumnos { width: 100%; border-collapse: collapse; }
+  .empresa-alumnos td { padding: 8px 14px; border-bottom: var(--border); font-size: 12px; }
+  .empresa-alumnos tr:last-child td { border-bottom: none; }
+  .empresa-alumnos tr:hover td { background: var(--gray7); }
+
+  /* ── MODAL CONFIRMACIÓN ── */
+  .modal-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 300;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(3px);
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--white);
+    border-radius: 12px;
+    padding: 28px;
+    max-width: 420px;
+    width: 92%;
+    box-shadow: 0 20px 60px rgba(26,39,68,0.35);
+    animation: popIn 0.18s ease;
+    overflow: hidden;
+  }
+  @keyframes popIn { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .modal-icon { font-size: 40px; text-align: center; margin-bottom: 14px; }
+  .modal h3 { font-family: 'Crimson Pro', serif; font-size: 20px; font-weight: 600; text-align: center; margin-bottom: 8px; color: var(--az); }
+  .modal p { font-size: 13px; color: var(--gray2); text-align: center; line-height: 1.6; margin-bottom: 22px; white-space: pre-line; }
+  .modal-actions { display: flex; gap: 10px; justify-content: center; }
+
+  /* ── TOAST ── */
+  #toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: var(--az);
+    color: white;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    z-index: 400;
+    display: flex; align-items: center; gap: 8px;
+    transform: translateY(20px); opacity: 0;
+    transition: all 0.25s;
+    pointer-events: none;
+    max-width: 360px;
+    box-shadow: var(--shadow-lg);
+    border-left: 4px solid var(--gold);
+  }
+  #toast.show { transform: translateY(0); opacity: 1; }
+  #toast.success { background: var(--green); border-left-color: #7fffc4; }
+  #toast.error { background: var(--red); border-left-color: #ffaaaa; }
+  #toast.warning { background: #7a6000; border-left-color: var(--gold-light); }
+
+  /* ── EMPTY STATE ── */
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--gray3);
+  }
+  .empty-state svg { margin-bottom: 16px; opacity: 0.3; }
+  .empty-state p { font-size: 14px; }
+
+  /* ── STATS BAR ── */
+  .stats-bar {
+    display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;
+  }
+  .stat-card {
+    background: var(--white);
+    border: 1px solid var(--gray5);
+    border-radius: 10px;
+    padding: 14px 18px;
+    flex: 1; min-width: 130px;
+    box-shadow: var(--shadow);
+    display: flex; flex-direction: column; gap: 4px;
+    border-left: 4px solid var(--gold);
+  }
+  .stat-card .stat-num {
+    font-family: 'Crimson Pro', serif;
+    font-size: 28px; font-weight: 600; color: var(--az);
+    line-height: 1;
+  }
+  .stat-card .stat-label { font-size: 11px; color: var(--gray3); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+
+  /* ── HISTORIAL PANEL ── */
+  .hist-item {
+    border-left: 3px solid var(--gray5);
+    padding: 8px 14px;
+    margin-bottom: 8px;
+    font-size: 13px;
+    color: var(--gray2);
+    background: var(--gray7);
+    border-radius: 0 6px 6px 0;
+  }
+  .hist-item.new { border-color: var(--az); }
+  .hist-item.edit { border-color: var(--gold); }
+  .hist-item.del { border-color: var(--red); }
+  .hist-time { font-family: monospace; font-size: 10px; color: var(--gray4); margin-bottom: 2px; }
+
+  /* ── DELETE PENDING ── */
+  .pending-section {
+    background: #fff8f8;
+    border: 1.5px solid #e8c0b8;
+    border-radius: 10px;
+    padding: 16px 18px;
+    margin-bottom: 16px;
+  }
+  .pending-section h3 { font-family: 'Crimson Pro', serif; font-size: 16px; font-weight: 600; color: var(--red); margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+  .pending-item {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--white);
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin-bottom: 6px;
+    font-size: 13px;
+    border: 1px solid #e8c0b8;
+  }
+  .pending-item:last-child { margin-bottom: 0; }
+  .pending-actions { display: flex; gap: 6px; }
+
+  #dropZone.drag-over { border-color: var(--az); background: var(--az-light); transform: scale(1.01); }
+  #dropZone:hover { border-color: var(--az2); background: var(--az-light); }
+  #previewTable th { background: var(--gray6); padding: 6px 10px; text-align:left; font-size:11px; font-weight:600; color:var(--gray3); white-space:nowrap; border-bottom: var(--border); }
+  #previewTable td { padding: 5px 10px; border-bottom: var(--border); white-space:nowrap; overflow:hidden; max-width:160px; text-overflow:ellipsis; }
+  #previewTable tr:last-child td { border-bottom:none; }
+  .map-row { display:contents; }
+  .map-label { font-size:11px; font-weight:600; color:var(--gray2); display:flex; align-items:center; gap:4px; }
+  .map-label.required::after { content:"*"; color:var(--red); margin-left:2px; }
+  .map-select { padding:5px 8px; border:var(--border); border-radius:var(--radius); font-size:12px; font-family:var(--font); width:100%; outline:none; }
+  .map-select:focus { border-color:var(--az); }
+  .map-select.matched { border-color:var(--green); background:var(--green-light); }
+  .map-select.unmatched { border-color:var(--gold); background:var(--gold-light); }
+
+  /* Toggle switch */
+  .toggle { position: relative; display: inline-block; width: 40px; height: 22px; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider {
+    position: absolute; cursor: pointer; inset: 0;
+    background: var(--gray5); border-radius: 22px; transition: 0.2s;
+  }
+  .toggle-slider:before {
+    position: absolute; content: ""; height: 16px; width: 16px;
+    left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.2s;
+  }
+  .toggle input:checked + .toggle-slider { background: var(--az); }
+  .toggle input:checked + .toggle-slider:before { transform: translateX(18px); }
+
+  .menu-item {
+    display:block; width:100%; padding:9px 16px;
+    background:none; border:none; text-align:left;
+    font-family:var(--font); font-size:13px; color:var(--gray2);
+    cursor:pointer; transition:background 0.1s;
+  }
+  .menu-item:hover { background:var(--gray7); color:var(--az); }
+.clave-input-wrap { position:relative; margin-bottom:8px; }
+  .clave-input-wrap input {
+    width:100%; padding:11px 42px 11px 14px;
+    border:2px solid var(--gray5); border-radius:var(--radius);
+    font-size:16px; font-family:var(--mono); letter-spacing:0.2em;
+    text-align:center; outline:none;
+    transition:border-color 0.15s, box-shadow 0.15s;
+  }
+  .clave-input-wrap input:focus { border-color:var(--az); box-shadow:0 0 0 3px var(--az-light); }
+  .toggle-pass {
+    position:absolute; right:10px; top:50%; transform:translateY(-50%);
+    background:none; border:none; cursor:pointer; color:var(--gray4); font-size:18px;
+    padding:4px;
+  }
+  .toggle-pass:hover { color:var(--gray2); }
+  #claveError {
+    display:none; align-items:center; gap:6px;
+    background:var(--red-light); color:var(--red);
+    border-radius:4px; padding:7px 10px;
+    font-size:12px; font-weight:500; margin-bottom:12px;
+  }
+  .clave-actions { display:flex; gap:10px; margin-top:16px; }
+  .clave-actions button { flex:1; }
+  .clave-hint { font-size:11px; color:var(--gray4); margin-top:10px; }
+  @keyframes shake {
+    0%,100% { transform:translateX(0); }
+    20% { transform:translateX(-8px); }
+    40% { transform:translateX(8px); }
+    60% { transform:translateX(-5px); }
+    80% { transform:translateX(5px); }
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--gray5); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--gray4); }
+
+  /* ── RESPONSIVE ── */
+
+  /* Tabla: scroll horizontal en pantallas pequeñas */
+  .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* Header compacto en móvil */
+  @media (max-width: 640px) {
+    header { height: auto; padding: 8px 12px; flex-wrap: wrap; gap: 6px; }
+    .header-left { flex: 1; min-width: 0; }
+    header h1 { font-size: 13px; }
+    header small { display: none; }
+    .logo-badge { font-size: 10px; padding: 2px 6px; }
+    .user-info { gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+    #saveIndicator { display: none !important; }
+    .role-badge { display: none; }
+
+    /* Nav: scroll horizontal con tabs compactos */
+    nav { padding: 0 8px; overflow-x: auto; -webkit-overflow-scrolling: touch; gap: 0; }
+    nav::-webkit-scrollbar { display: none; }
+    .tab { padding: 10px 12px; font-size: 12px; gap: 4px; white-space: nowrap; flex-shrink: 0; }
+    .tab svg { display: none; }
+
+    /* Main */
+    main { padding: 10px 10px; }
+
+    /* Stats: 2 columnas */
+    .stats-bar { gap: 8px; }
+    .stat-card { min-width: calc(50% - 4px); padding: 10px 12px; }
+    .stat-card .stat-num { font-size: 20px; }
+
+    /* Toolbar: columna completa */
+    .toolbar { padding: 10px 10px; gap: 8px; }
+    .toolbar .search-wrap { min-width: 100%; order: -1; }
+    .filter-select { flex: 1; min-width: calc(50% - 4px); font-size: 12px; padding: 7px 8px; }
+    .toolbar .btn { flex: 1; justify-content: center; font-size: 12px; padding: 8px 10px; }
+
+    /* Tabla: ocultar columnas y usar tarjetas virtuales */
+    .hide-mobile { display: none !important; }
+    th, td { padding: 8px 10px; font-size: 12px; }
+
+    /* Modal centrado en móvil: pantalla completa */
+    .overlay { padding: 0; align-items: flex-end; }
+    .panel { width: 100%; max-height: 95vh; height: auto; border-radius: 16px 16px 0 0; }
+    .panel-header { border-radius: 16px 16px 0 0; padding: 14px 16px; }
+    .panel-body { padding: 14px 16px; }
+    .panel-footer { padding: 12px 16px; }
+
+    /* Forms: una columna siempre */
+    .form-row.col2, .form-row.col3 { grid-template-columns: 1fr; }
+
+    /* Modales */
+    .modal { width: 95%; padding: 20px 16px; }
+    #modalImport > div { width: 98% !important; max-height: 95vh; }
+
+    /* Empresas cards */
+    .empresa-card-header { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .empresa-card-header > div:last-child { width: 100%; justify-content: flex-start; }
+    .empresa-alumnos td { padding: 6px 10px; font-size: 11px; }
+
+    /* Pendientes */
+    .pending-item { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .pending-actions { width: 100%; }
+    .pending-actions .btn { flex: 1; justify-content: center; }
+
+    /* Toast al fondo centrado */
+    #toast { bottom: 16px; right: 10px; left: 10px; max-width: none; }
+
+    /* Menú datos: ajuste de posición */
+    #menuDatos { right: 0; left: auto; min-width: 200px; }
+  }
+
+  @media (min-width: 641px) and (max-width: 900px) {
+    header h1 font-size: 14px;
+    .form-row.col3 { grid-template-columns: 1fr 1fr; }
+    .hide-mobile { display: none !important; }
+    th, td { font-size: 12px; }
+    .toolbar .filter-select { min-width: 110px; }
+    .panel { width: 420px; }
+    .stat-card { min-width: 120px; }
+  }
+
+  /* ── SELECCIÓN MÚLTIPLE ── */
+  .cb-row { width: 16px; height: 16px; cursor: pointer; accent-color: var(--az); flex-shrink: 0; }
+  tbody tr.selected-row { background: var(--az-light) !important; }
+  tbody tr.selected-row:hover { background: #d0dff8 !important; }
+
+  #seleccionBar {
+    display: none;
+    position: sticky; bottom: 0; left: 0; right: 0;
+    background: var(--az); color: white;
+    padding: 12px 24px;
+    align-items: center; gap: 12px;
+    z-index: 90;
+    box-shadow: 0 -4px 16px rgba(26,39,68,0.3);
+    border-radius: 8px 8px 0 0;
+    border-top: 3px solid var(--gold);
+    animation: slideUp 0.2s ease;
+  }
+  #seleccionBar.visible { display: flex; }
+  @keyframes slideUp { from { transform: translateY(100%); opacity:0; } to { transform:translateY(0); opacity:1; } }
+  #seleccionBar .sel-count {
+    font-size: 13px; font-weight: 700;
+    background: rgba(255,255,255,0.2);
+    padding: 3px 12px; border-radius: 20px;
+    font-family: var(--mono);
+  }
+  #seleccionBar .sel-label { font-size: 13px; opacity: 0.85; flex: 1; }
+  .btn-sel-danger { background: #ff4444; color: white; border: none; padding: 7px 14px; border-radius: var(--radius); font-family: var(--font); font-size: 13px; font-weight: 600; cursor: pointer; display:flex; align-items:center; gap:6px; }
+  .btn-sel-danger:hover { background: #cc0000; }
+  .btn-sel-cancel { background: rgba(255,255,255,0.15); color: white; border: 1px solid rgba(255,255,255,0.3); padding: 7px 14px; border-radius: var(--radius); font-family: var(--font); font-size: 13px; cursor: pointer; }
+  .btn-sel-cancel:hover { background: rgba(255,255,255,0.25); }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Leaflet popup customizado */
+  .emp-popup { font-family: var(--font); min-width: 260px; }
+  .emp-popup-header { background: var(--az); color: white; margin: -14px -20px 12px; padding: 12px 16px; border-radius: 4px 4px 0 0; }
+  .emp-popup-name { font-size: 14px; font-weight: 700; line-height: 1.2; }
+  .emp-popup-meta { font-size: 11px; opacity: 0.8; margin-top: 3px; }
+  .emp-popup-section { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gray4); margin: 10px 0 6px; border-bottom: 1px solid var(--gray5); padding-bottom: 4px; }
+  .emp-popup-row { display: flex; gap: 6px; font-size: 12px; color: var(--gray2); margin-bottom: 4px; line-height: 1.3; }
+  .emp-popup-row b { color: var(--gray1); min-width: 70px; flex-shrink: 0; }
+  .emp-alumno-chip { display: inline-flex; align-items: center; gap: 4px; background: var(--az-light); color: var(--az); border-radius: 4px; padding: 3px 7px; font-size: 11px; font-weight: 500; margin: 2px 2px 2px 0; }
+  .emp-alumno-chip.old { background: var(--gray6); color: var(--gray3); }
+  .emp-popup-btn { display: block; width: 100%; margin-top: 10px; padding: 7px; background: var(--az); color: white; border: none; border-radius: 4px; font-family: var(--font); font-size: 12px; font-weight: 600; cursor: pointer; text-align: center; }
+  .emp-popup-btn:hover { background: var(--az2); }
+  .leaflet-popup-content-wrapper { border-radius: 8px !important; box-shadow: 0 8px 32px rgba(0,61,165,0.2) !important; }
+  .leaflet-popup-content { margin: 14px 20px !important; }
+
+</style>
+<body>
+
+<header>
+  <div class="header-left">
+    <div class="logo-badge">FEOE</div>
+    <h1>Formación en Empresa u Organismo Equiparado <small>· FP Aragón</small></h1>
+  </div>
+  <div class="user-info">
+    <div id="saveIndicator" style="font-size:11px;opacity:0.7;display:flex;align-items:center;gap:5px">
+      <span id="saveIcon">💾</span><span id="saveText">Sin cambios</span>
+    </div>
+    <div style="position:relative">
+      <button class="btn btn-sm" style="background:rgba(255,255,255,0.15);color:white;border:1px solid rgba(255,255,255,0.3)" onclick="toggleMenuDatos(event)">
+        🗄 Datos ▾
+      </button>
+      <div id="menuDatos" style="display:none;position:absolute;right:0;top:calc(100% + 6px);background:white;border:1px solid var(--gray5);border-radius:10px;box-shadow:var(--shadow-lg);min-width:260px;z-index:500;overflow:hidden">
+
+        <!-- Guardado local -->
+        <div style="padding:7px 14px 4px;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--gray4)">Guardado local</div>
+        <button class="menu-item" onclick="cargarDatos().then(()=>{toast('Datos recargados','success');cerrarMenuDatos();})">
+          <span style="width:20px;text-align:center">💾</span> Guardar ahora
+        </button>
+
+        <div style="height:1px;background:var(--gray6);margin:4px 0"></div>
+
+        <!-- Copia de seguridad -->
+        <div style="padding:7px 14px 4px;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--gray4)">Copia de seguridad</div>
+        <button class="menu-item" onclick="exportarJSON()">
+          <span style="width:20px;text-align:center">📦</span> Exportar copia de seguridad (.json)
+        </button>
+        <label class="menu-item" style="cursor:pointer;display:flex;align-items:center;gap:0" onclick="cerrarMenuDatos()">
+          <span style="width:20px;text-align:center">📂</span> Restaurar copia de seguridad (.json)
+          <input type="file" accept=".json" style="display:none" onchange="restaurarBackupJSON(event)">
+        </label>
+
+        <div style="height:1px;background:var(--gray6);margin:4px 0"></div>
+
+        <!-- Exportar datos -->
+        <div style="padding:7px 14px 4px;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--gray4)">Exportar datos</div>
+        <button class="menu-item" onclick="exportarExcel()">
+          <span style="width:20px;text-align:center">📊</span> Exportar alumnado a Excel (.xlsx)
+        </button>
+        <button class="menu-item" onclick="exportarEmpresasExcel()">
+          <span style="width:20px;text-align:center">🏢</span> Exportar empresas a Excel (.xlsx)
+        </button>
+
+        <div id="storageInfo" style="padding:7px 14px;font-size:11px;color:var(--gray4);border-top:1px solid var(--gray6);margin-top:4px">BD SQLite · servidor</div>
+      </div>
+    </div>
+    <span id="roleDisplay" class="role-badge admin">👤 Administrador</span>
+    <button class="btn btn-sm" style="background:rgba(255,255,255,0.15);color:white;border:1px solid rgba(255,255,255,0.3)" onclick="toggleRole()">Cambiar rol</button>
+  </div>
+</header>
+
+<nav>
+  <div class="tab active" onclick="switchTab('alumnado')" id="tab-alumnado">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+    Alumnado
+    <span class="count" id="cnt-alumnado">0</span>
+  </div>
+  <div class="tab" onclick="switchTab('empresas')" id="tab-empresas">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/></svg>
+    Empresas
+    <span class="count" id="cnt-empresas">0</span>
+  </div>
+  <div class="tab" onclick="switchTab('pendientes')" id="tab-pendientes">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    Pendientes
+    <span class="count" id="cnt-pendientes" style="background:#FFBBB0;color:var(--red)">0</span>
+  </div>
+  <div class="tab" onclick="switchTab('historial')" id="tab-historial">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+    Historial
+  </div>
+  <div class="tab" onclick="switchTab('mapa')" id="tab-mapa">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+    Mapa
+  </div>
+  <div class="tab" onclick="switchTab('visitas')" id="tab-visitas">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+    Visitas
+    <span class="count" id="cnt-visitas">0</span>
+  </div>
+  <div class="tab" onclick="switchTab('usuarios')" id="tab-usuarios" style="display:none;margin-left:auto">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/><circle cx="19" cy="8" r="2.5"/><path d="M22 12c1.5.5 2 1.5 2 3"/></svg>
+    Usuarios
+    <span class="count" id="cnt-usuarios" style="background:rgba(200,168,75,0.3);color:var(--gold-light)">0</span>
+  </div>
+</nav>
+
+<main>
+
+  <!-- ── VISTA ALUMNADO ── -->
+  <div id="view-alumnado">
+    <div class="stats-bar" id="statsBar"></div>
+    <div class="toolbar">
+      <div class="search-wrap">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="searchInput" placeholder="Buscar por nombre, DNI, empresa, CIF…" oninput="renderTabla()">
+      </div>
+      <select class="filter-select" id="filterCurso" onchange="renderTabla()">
+        <option value="">Todos los cursos</option>
+      </select>
+      <select class="filter-select" id="filterFamilia" onchange="renderTabla()">
+        <option value="">Todas las familias</option>
+      </select>
+      <select class="filter-select" id="filterNivel" onchange="renderTabla()">
+        <option value="">Todos los niveles</option>
+        <option value="1CFGB">1º CFGB</option>
+        <option value="2CFGB">2º CFGB</option>
+        <option value="1CFGM">1º CFGM</option>
+        <option value="2CFGM">2º CFGM</option>
+        <option value="1CFGS">1º CFGS</option>
+        <option value="2CFGS">2º CFGS</option>
+        <option value="CE">C. Especialización</option>
+      </select>
+      <select class="filter-select" id="filterEmpresa" onchange="renderTabla()">
+        <option value="">Todas las empresas</option>
+      </select>
+      <select class="filter-select" id="filterAnio" onchange="renderTabla()">
+        <option value="">Todos los años</option>
+      </select>
+      <button class="btn btn-secondary" onclick="abrirImport('alumnado')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Importar
+      </button>
+      <button class="btn btn-primary" onclick="abrirPanelAlumno(null)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Nuevo alumno
+      </button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th id="thCheckAll" style="width:32px;padding:10px 8px 10px 14px" title="Seleccionar todos"><input type="checkbox" class="cb-row" id="cbAll" onclick="toggleSelAll(this)" style="display:none"></th>
+            <th onclick="sortBy('id')" class="mono" style="width:40px">#<span class="sort-arrow">↕</span></th>
+            <th onclick="sortBy('apellidos')">Alumno / DNI<span class="sort-arrow">↕</span></th>
+            <th onclick="sortBy('familia')" class="hide-mobile">Familia Profesional<span class="sort-arrow">↕</span></th>
+            <th onclick="sortBy('curso')" style="min-width:110px">Curso / Nivel<span class="sort-arrow">↕</span></th>
+            <th onclick="sortBy('empresa')">Empresa</th>
+            <th class="hide-mobile">Periodo</th>
+            <th class="hide-mobile" title="Observaciones del alumno en la última estancia">Obs.</th>
+            <th style="width:110px" title="✏️ Ver/editar · 🗑 Eliminar">Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="tablaBody"></tbody>
+      </table>
+    </div>
+    <div id="tablaEmpty" class="empty-state" style="display:none">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+      <p>No se encontraron registros con los filtros aplicados.</p>
+    </div>
+    <div id="tablaFooter" style="padding:10px 16px;font-size:12px;color:var(--gray3);background:white;border:var(--border);border-top:none;border-radius:0 0 var(--radius) var(--radius)"></div>
+    <!-- Barra de selección múltiple (solo admin) -->
+    <div id="seleccionBar">
+      <span class="sel-count" id="selCount">0</span>
+      <span class="sel-label">alumno(s) seleccionado(s)</span>
+      <button class="btn-sel-cancel" onclick="limpiarSeleccion()">✕ Cancelar</button>
+      <button class="btn-sel-danger" onclick="eliminarSeleccionados()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+        Eliminar seleccionados
+      </button>
+    </div>
+  </div>
+
+  <!-- ── VISTA EMPRESAS ── -->
+  <div id="view-empresas" style="display:none">
+    <div class="toolbar">
+      <div class="search-wrap">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="searchEmpresa" placeholder="Buscar empresa, CIF, contacto…" oninput="renderEmpresas()">
+      </div>
+      <button class="btn btn-secondary" onclick="abrirImport('empresas')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Importar
+      </button>
+      <button class="btn btn-primary" onclick="abrirPanelEmpresa(null)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Nueva empresa
+      </button>
+    </div>
+    <div id="empresasContainer"></div>
+  </div>
+
+  <!-- ── VISTA PENDIENTES ── -->
+  <div id="view-pendientes" style="display:none">
+    <div style="margin-bottom:12px">
+      <h2 style="font-size:15px;font-weight:600;color:var(--red);margin-bottom:4px">⚠️ Solicitudes de eliminación pendientes</h2>
+      <p style="font-size:12px;color:var(--gray3)">Solo los administradores pueden aprobar o rechazar estas solicitudes. Los registros permanecen visibles hasta su confirmación.</p>
+    </div>
+    <div id="pendientesList"></div>
+  </div>
+
+  <!-- ── VISTA HISTORIAL ── -->
+  <div id="view-historial" style="display:none">
+    <div class="toolbar">
+      <div class="search-wrap">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="searchHistorial" placeholder="Buscar en historial…" oninput="renderHistorial()">
+      </div>
+    </div>
+    <div id="historialList" style="background:white;border:var(--border);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow)"></div>
+  </div>
+
+  <!-- ── VISTA MAPA ── -->
+  <div id="view-mapa" style="display:none">
+    <div class="toolbar" style="margin-bottom:12px">
+      <div class="search-wrap">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="searchMapa" placeholder="Filtrar empresas en el mapa…" oninput="filtrarMapa()">
+      </div>
+      <select class="filter-select" id="filterMapaCurso" onchange="filtrarMapa()">
+        <option value="">Todos los cursos</option>
+      </select>
+      <button class="btn btn-ghost btn-sm" onclick="geocodificarTodas(true)" id="btnGeoAll" title="Forzar re-geocodificación de todas las empresas (limpia caché)">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        Geocodificar
+      </button>
+      <div id="mapaLegenda" style="display:flex;align-items:center;gap:12px;font-size:12px;color:var(--gray3);margin-left:auto">
+        <span style="display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#003DA5;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.3)"></span> Con alumnado actual</span>
+        <span style="display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#6B6F80;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.3)"></span> Sin alumnado</span>
+      </div>
+    </div>
+    <div style="position:relative;border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-lg);border:var(--border)">
+      <div id="mapaContainer" style="height:calc(100vh - 220px);min-height:400px;background:var(--gray6)"></div>
+      <div id="mapaLoader" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(255,255,255,0.9);z-index:500;gap:10px">
+        <div style="width:36px;height:36px;border:3px solid var(--az-light);border-top-color:var(--az);border-radius:50%;animation:spin 0.8s linear infinite"></div>
+        <span id="mapaLoaderMsg" style="font-size:13px;color:var(--gray3)">Cargando mapa…</span>
+      </div>
+      <div id="sinDireccion" style="display:none;position:absolute;bottom:12px;left:50%;transform:translateX(-50%);background:white;border:var(--border);border-radius:20px;padding:6px 14px;font-size:12px;color:var(--gray3);box-shadow:var(--shadow);z-index:400;white-space:nowrap">
+        ⚠️ <span id="sinDireccionMsg"></span>
+      </div>
+    </div>
+    <!-- Estado por empresa -->
+    <div id="mapaEstadoEmpresas" style="margin-top:12px;background:white;border:var(--border);border-radius:var(--radius);padding:14px 16px;box-shadow:var(--shadow)">
+      <div style="font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--gray3);margin-bottom:10px">Estado de geolocalización por empresa</div>
+      <div id="mapaEstadoLista" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px"></div>
+      <div style="margin-top:10px;font-size:11px;color:var(--gray4)">💡 <b>Consejo:</b> Para que una empresa aparezca en el mapa, rellena el campo <b>Dirección</b> en su ficha (calle, número y ciudad). Cuanto más completa, mejor resultado.</div>
+    </div>
+  </div>
+
+  <!-- ── VISTA USUARIOS (solo admin) ── -->
+  <div id="view-usuarios" style="display:none">
+    <div class="toolbar">
+      <div class="search-wrap">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="searchUsuarios" placeholder="Buscar usuario…" oninput="renderUsuarios()">
+      </div>
+      <button class="btn btn-primary" onclick="abrirPanelUsuario(null)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Nuevo usuario
+      </button>
+    </div>
+
+    <!-- Info box -->
+    <div style="background:#eef4ff;border:1.5px solid #b8ceff;border-radius:8px;padding:14px 18px;margin-bottom:16px;font-size:13px;color:#2a3a6b;display:flex;gap:12px;align-items:flex-start">
+      <span style="font-size:20px;flex-shrink:0">ℹ️</span>
+      <div>
+        <b>Gestión de usuarios.</b> El admin puede crear profesores con acceso a la aplicación.
+        Los profesores pueden crear y editar alumnos/estancias, pero <b>las eliminaciones requieren aprobación del administrador</b>.
+        La contraseña inicial debe comunicarse al docente, quien podrá cambiarla desde su perfil.
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:40px">#</th>
+            <th>Usuario</th>
+            <th>Nombre</th>
+            <th class="hide-mobile">Rol</th>
+            <th class="hide-mobile">Estado</th>
+            <th class="hide-mobile">Alta</th>
+            <th style="width:130px">Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="usuariosBody"></tbody>
+      </table>
+    </div>
+    <div id="usuariosEmpty" class="empty-state" style="display:none">
+      <p>No se encontraron usuarios.</p>
+    </div>
+  </div>
+
+  <!-- ── VISTA VISITAS ── -->
+  <div id="view-visitas" style="display:none">
+    <div class="toolbar">
+      <div class="search-wrap">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="searchVisitas" placeholder="Buscar alumno o empresa..." oninput="renderVisitas()">
+      </div>
+      <select class="filter-select" id="filterVisitasCurso" onchange="renderVisitas()">
+        <option value="">Todos los cursos</option>
+      </select>
+      <select class="filter-select" id="filterVisitasPendientes" onchange="renderVisitas()">
+        <option value="">Todos</option>
+        <option value="pendiente">Pendientes validacion</option>
+        <option value="ok">Validados</option>
+      </select>
+      <button class="btn btn-ghost btn-sm" onclick="cargarVisitas()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.49"/></svg>
+        Actualizar
+      </button>
+    </div>
+
+    <div id="visitasContent">
+      <div class="empty-state">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <p>Cargando visitas...</p>
+      </div>
+    </div>
+  </div>
+
+</main><!-- ── PANEL USUARIO ── -->
+<div class="overlay" id="overlayUsuario" onclick="cerrarPaneles(event)">
+  <div class="panel" style="width:520px">
+    <div class="panel-header">
+      <div>
+        <h2 id="panelUsuarioTitle">Nuevo usuario</h2>
+        <small id="panelUsuarioSub">Crea una cuenta de acceso para un docente</small>
+      </div>
+      <button class="close-btn" onclick="cerrarPanel('overlayUsuario')">✕</button>
+    </div>
+    <div class="panel-body">
+      <input type="hidden" id="usuarioId">
+
+      <div class="form-section">
+        <div class="form-section-title">👤 Datos de acceso</div>
+        <div class="form-row col2">
+          <div class="form-group">
+            <label>Usuario (login) *</label>
+            <input type="text" id="uUsername" placeholder="prof.garcia" autocomplete="off" class="mono">
+            <div class="form-hint">Sin espacios ni caracteres especiales</div>
+          </div>
+          <div class="form-group">
+            <label>Rol *</label>
+            <select id="uRole">
+              <option value="admin">Admin (control total)</option>
+              <option value="tutor">Tutor/a (gestiona y valida)</option>
+              <option value="profe">Profesor/a (edita, pendiente validar)</option>
+              <option value="invitado">Invitado (solo lectura)</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Nombre completo</label>
+            <input type="text" id="uNombre" placeholder="María García López">
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section" id="seccionPasswordNuevo">
+        <div class="form-section-title">🔑 Contraseña inicial</div>
+        <div class="form-row col2">
+          <div class="form-group">
+            <label>Contraseña *</label>
+            <input type="password" id="uPassword" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+          </div>
+          <div class="form-group">
+            <label>Confirmar *</label>
+            <input type="password" id="uPassword2" placeholder="Repetir contraseña" autocomplete="new-password">
+          </div>
+        </div>
+        <div class="form-hint">Comunica esta contraseña al docente. Podrá cambiarla desde su perfil.</div>
+      </div>
+
+      <div class="form-section" id="seccionPasswordEditar" style="display:none">
+        <div class="form-section-title">🔑 Cambiar contraseña <span style="font-size:12px;font-weight:400;opacity:0.7">(opcional — dejar vacío para no cambiar)</span></div>
+        <div class="form-row col2">
+          <div class="form-group">
+            <label>Nueva contraseña</label>
+            <input type="password" id="uPasswordEdit" placeholder="Dejar vacío para no cambiar" autocomplete="new-password">
+          </div>
+          <div class="form-group">
+            <label>Confirmar</label>
+            <input type="password" id="uPasswordEdit2" placeholder="Repetir nueva contraseña" autocomplete="new-password">
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section" id="seccionEstadoUsuario" style="display:none">
+        <div class="form-section-title">⚙️ Estado de la cuenta</div>
+        <div style="display:flex;align-items:center;gap:12px;padding:10px 0">
+          <label class="toggle" style="flex-shrink:0">
+            <input type="checkbox" id="uActivo" checked>
+            <span class="toggle-slider"></span>
+          </label>
+          <div>
+            <div style="font-size:13px;font-weight:600">Cuenta activa</div>
+            <div class="form-hint">Desactivar impide el acceso sin eliminar los datos</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="panel-footer">
+      <button class="btn btn-ghost" onclick="cerrarPanel('overlayUsuario')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarUsuario()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        Guardar
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── PANEL ALUMNO ── -->
+<div class="overlay" id="overlayAlumno" onclick="cerrarPaneles(event)">
+  <div class="panel" id="panelAlumno" style="width:860px">
+    <div class="panel-header">
+      <div>
+        <h2 id="panelAlumnoTitle">Nuevo alumno</h2>
+        <small id="panelAlumnoSub">Rellena los datos del alumno/a</small>
+      </div>
+      <button class="close-btn" onclick="cerrarPanel('overlayAlumno')">✕</button>
+    </div>
+    <div class="panel-body" style="padding:20px 24px">
+      <input type="hidden" id="alumnoId">
+
+      <!-- DATOS PERSONALES -->
+      <div class="form-section">
+        <div class="form-section-title">📋 Datos personales</div>
+        <div class="form-row col2">
+          <div class="form-group">
+            <label>Apellidos *</label>
+            <input type="text" id="aApellidos" placeholder="García Martínez">
+          </div>
+          <div class="form-group">
+            <label>Nombre *</label>
+            <input type="text" id="aNombre" placeholder="Carlos">
+          </div>
+        </div>
+        <div class="form-row col2">
+          <div class="form-group">
+            <label>DNI/NIE *</label>
+            <input type="text" id="aDni" placeholder="12345678A" class="mono">
+          </div>
+          <div class="form-group">
+            <label>Familia Profesional</label>
+            <select id="aFamilia">
+              <option value="">Selecciona…</option>
+              <option>INFORMÁTICA Y COMUNICACIONES</option>
+              <option>ADMINISTRACIÓN Y GESTIÓN</option>
+              <option>COMERCIO Y MARKETING</option>
+              <option>ELECTRICIDAD Y ELECTRÓNICA</option>
+              <option>INSTALACIÓN Y MANTENIMIENTO</option>
+              <option>SANIDAD</option>
+              <option>SERVICIOS SOCIOCULTURALES</option>
+              <option>HOSTELERÍA Y TURISMO</option>
+              <option>EDIFICACIÓN Y OBRA CIVIL</option>
+              <option>FABRICACIÓN MECÁNICA</option>
+              <option>TRANSPORTE Y MANTENIMIENTO DE VEHÍCULOS</option>
+              <option>AGRARIA</option>
+              <option>IMAGEN PERSONAL</option>
+              <option>ARTES GRÁFICAS</option>
+              <option>QUÍMICA</option>
+              <option>OTRA</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- ESTANCIAS FEOE -->
+      <div id="seccionEstancias" style="display:none;margin-top:16px">
+
+        <!-- Cabecera estancias -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div style="font-family:'Crimson Pro',serif;font-size:17px;font-weight:600;color:var(--az);display:flex;align-items:center;gap:8px">
+            🏢 Estancias FEOE
+            <span id="badgeNumEstancias" style="font-family:'DM Sans',sans-serif;font-size:11px;background:var(--az);color:var(--gold);padding:2px 8px;border-radius:20px;font-weight:700"></span>
+          </div>
+          <button id="btnNuevaEstancia" class="btn btn-sm btn-secondary" onclick="solicitarNuevaEstancia()" type="button"
+            style="display:none">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Nueva estancia
+          </button>
+        </div>
+
+        <!-- Lista de estancias (tarjetas) -->
+        <div id="listaEstancias"></div>
+      </div>
+
+      <!-- FORMULARIO ESTANCIA (drawer deslizante) -->
+      <div id="formEstancia" style="display:none;background:var(--cream,#f8f6f0);border:2px solid var(--gold);border-radius:10px;padding:18px 20px;margin-top:16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+          <div style="font-family:'Crimson Pro',serif;font-size:16px;font-weight:600;color:var(--az)" id="formEstanciaTitulo">🏢 Estancia FEOE</div>
+          <button class="btn btn-ghost btn-sm" onclick="cancelarFormEstancia()">✕ Cerrar</button>
+        </div>
+        <input type="hidden" id="estanciaId">
+
+        <!-- Fila 1: Curso + Nivel -->
+        <div class="form-row col2" style="margin-bottom:10px">
+          <div class="form-group">
+            <label>Curso académico *</label>
+            <select id="aCurso">
+              <option value="">Selecciona…</option>
+              <option>2025-2026</option>
+              <option>2024-2025</option>
+              <option>2023-2024</option>
+              <option>2022-2023</option>
+              <option>2021-2022</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Nivel / Ciclo</label>
+            <select id="aNivel">
+              <option value="">Selecciona…</option>
+              <optgroup label="Grado Básico">
+                <option value="1CFGB">1º CFGB</option>
+                <option value="2CFGB">2º CFGB</option>
+              </optgroup>
+              <optgroup label="Grado Medio">
+                <option value="1CFGM">1º CFGM</option>
+                <option value="2CFGM">2º CFGM</option>
+              </optgroup>
+              <optgroup label="Grado Superior">
+                <option value="1CFGS">1º CFGS</option>
+                <option value="2CFGS">2º CFGS</option>
+              </optgroup>
+              <optgroup label="Especialización">
+                <option value="CE">Curso de Especialización</option>
+              </optgroup>
+            </select>
+          </div>
+        </div>
+
+        <!-- Empresa destacada -->
+        <div style="background:var(--az);border-radius:8px;padding:12px 16px;margin-bottom:12px">
+          <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.6);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:8px">Empresa</div>
+          <div class="form-row" style="margin-bottom:8px">
+            <div class="form-group">
+              <select id="aEmpresa" onchange="autocompletarEmpresa()"
+                style="background:rgba(255,255,255,0.12);color:white;border:1px solid rgba(255,255,255,0.25);font-size:13px">
+                <option value="" style="color:var(--gray1)">— Seleccionar empresa registrada —</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row col2" style="margin-bottom:0">
+            <div class="form-group">
+              <label style="color:rgba(255,255,255,0.7);font-size:11px">Nombre empresa</label>
+              <input type="text" id="aEmpresaNombre" placeholder="Empresa S.L."
+                style="background:rgba(255,255,255,0.12);color:white;border:1px solid rgba(255,255,255,0.2);font-size:13px">
+            </div>
+            <div class="form-group">
+              <label style="color:rgba(255,255,255,0.7);font-size:11px">CIF</label>
+              <input type="text" id="aEmpresaCif" placeholder="B12345678" class="mono"
+                style="background:rgba(255,255,255,0.12);color:white;border:1px solid rgba(255,255,255,0.2);font-size:13px">
+            </div>
+          </div>
+        </div>
+
+        <!-- Periodo + Contacto -->
+        <div class="form-row col2" style="margin-bottom:10px">
+          <div class="form-group">
+            <label>Periodo inicio</label>
+            <input type="date" id="aPeriodoIni">
+          </div>
+          <div class="form-group">
+            <label>Periodo fin</label>
+            <input type="date" id="aPeriodoFin">
+          </div>
+        </div>
+        <div class="form-row" style="margin-bottom:10px">
+          <div class="form-group">
+            <label>Contacto empresa</label>
+            <input type="text" id="aContacto" placeholder="Nombre, cargo, teléfono…">
+          </div>
+        </div>
+
+        <!-- Observaciones -->
+        <div class="form-row col2" style="margin-bottom:10px">
+          <div class="form-group">
+            <label>Obs. empresa</label>
+            <textarea id="aObsEmpresa" placeholder="Notas sobre la empresa…" style="min-height:50px"></textarea>
+          </div>
+          <div class="form-group">
+            <label>Obs. alumno/a</label>
+            <textarea id="aObsAlumno" placeholder="Rendimiento, incidencias…" style="min-height:50px"></textarea>
+          </div>
+        </div>
+
+        <!-- Calificación + Supervisor -->
+        <div class="form-row col2" style="margin-bottom:10px">
+          <div class="form-group">
+            <label>Calificación FEOE</label>
+            <select id="aCalificacion">
+              <option value="">— Sin calificar —</option>
+              <option value="Apto">Apto</option>
+              <option value="No Apto">No Apto</option>
+              <option value="5">5</option><option value="6">6</option>
+              <option value="7">7</option><option value="8">8</option>
+              <option value="9">9</option><option value="10">10</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Supervisado por</label>
+            <select id="aSupervisor"><option value="">— Sin asignar —</option></select>
+          </div>
+        </div>
+
+        <!-- Seguimiento de visitas -->
+        <div id="seguimientosContainer" style="display:none;border-top:1px solid rgba(200,168,75,0.3);padding-top:14px;margin-top:6px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <div style="font-family:'Crimson Pro',serif;font-size:15px;font-weight:600;color:var(--az)">
+              📋 Seguimiento de visitas
+            </div>
+            <button class="btn btn-sm btn-secondary" onclick="abrirFormSeguimiento(null)" id="btnNuevaSeguimiento">+ Nueva visita</button>
+          </div>
+          <div id="seguimientosList" style="margin-bottom:10px"></div>
+          <div id="formSeguimiento" style="display:none;background:white;border:1px solid var(--gray5);border-radius:8px;padding:14px">
+            <input type="hidden" id="seguimientoId">
+            <div style="font-family:'Crimson Pro',serif;font-size:14px;font-weight:600;color:var(--az);margin-bottom:10px" id="formSeguimientoTitle">Nueva visita</div>
+            <div class="form-row col2">
+              <div class="form-group">
+                <label>Fecha</label>
+                <input type="date" id="seFecha">
+              </div>
+              <div class="form-group">
+                <label>Modalidad</label>
+                <select id="seModalidad">
+                  <option value="presencial">🏢 Presencial</option>
+                  <option value="telefonica">📞 Telefónica</option>
+                  <option value="telematica">💻 Telemática</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Anotaciones de la visita</label>
+              <textarea id="seAnotaciones" rows="4" placeholder="Descripción de la visita, observaciones, compromisos, valoración del tutor de empresa…"></textarea>
+            </div>
+            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">
+              <button class="btn btn-ghost btn-sm" onclick="cerrarFormSeguimiento()">Cancelar</button>
+              <button class="btn btn-primary btn-sm" onclick="guardarSeguimiento()">Guardar visita</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Botones del formulario estancia -->
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;padding-top:12px;border-top:1px solid var(--gray5)">
+          <button class="btn btn-ghost btn-sm" onclick="cancelarFormEstancia()">Cancelar</button>
+          <button class="btn btn-primary btn-sm" onclick="guardarEstancia()">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            Guardar estancia
+          </button>
+        </div>
+        <div id="btnsCancelarEstancia" style="display:none"></div>
+      </div>
+
+    </div>
+    <div class="panel-footer">
+      <button class="btn btn-ghost" onclick="cerrarPanel('overlayAlumno')">Cerrar</button>
+      <button class="btn btn-primary" onclick="guardarAlumno()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        Guardar alumno
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── PANEL EMPRESA ── -->
+<div class="overlay" id="overlayEmpresa" onclick="cerrarPaneles(event)">
+  <div class="panel" id="panelEmpresa">
+    <div class="panel-header">
+      <div>
+        <h2 id="panelEmpresaTitle">Nueva empresa</h2>
+        <small>Datos del centro de trabajo</small>
+      </div>
+      <button class="close-btn" onclick="cerrarPanel('overlayEmpresa')">✕</button>
+    </div>
+    <div class="panel-body">
+      <input type="hidden" id="empresaId">
+      <div class="form-section">
+        <div class="form-section-title">🏢 Datos de la empresa</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Nombre de la empresa *</label>
+            <input type="text" id="eNombre" placeholder="Empresa Tecnológica S.L.">
+          </div>
+        </div>
+        <div class="form-row col2">
+          <div class="form-group">
+            <label>CIF *</label>
+            <input type="text" id="eCif" placeholder="B12345678" class="mono">
+          </div>
+          <div class="form-group">
+            <label>Sector / Actividad</label>
+            <input type="text" id="eSector" placeholder="Informática, Telecomunicaciones…">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Dirección</label>
+            <input type="text" id="eDireccion" placeholder="C/ Ejemplo, 1 — Zaragoza">
+          </div>
+        </div>
+      </div>
+      <div class="form-section">
+        <div class="form-section-title">👤 Persona de contacto</div>
+        <div class="form-row col2">
+          <div class="form-group">
+            <label>Nombre contacto</label>
+            <input type="text" id="eContactoNombre" placeholder="María López">
+          </div>
+          <div class="form-group">
+            <label>Cargo</label>
+            <input type="text" id="eContactoCargo" placeholder="Jefa de RRHH">
+          </div>
+        </div>
+        <div class="form-row col2">
+          <div class="form-group">
+            <label>Teléfono</label>
+            <input type="text" id="eContactoTel" placeholder="976 000 000" class="mono">
+          </div>
+          <div class="form-group">
+            <label>Email</label>
+            <input type="text" id="eContactoEmail" placeholder="contacto@empresa.com">
+          </div>
+        </div>
+      </div>
+      <div class="form-section">
+        <div class="form-section-title">📝 Observaciones</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Observaciones generales</label>
+            <textarea id="eObs" placeholder="Historial de colaboración, valoración general, condiciones…"></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="panel-footer">
+      <button class="btn btn-ghost" onclick="cerrarPanel('overlayEmpresa')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarEmpresa()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        Guardar
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL CONFIRMACIÓN ── -->
+<div class="modal-overlay" id="modalConfirm">
+  <div class="modal">
+    <div class="modal-icon" id="modalIcon">⚠️</div>
+    <h3 id="modalTitle">¿Confirmar acción?</h3>
+    <p id="modalMsg">Esta acción no se puede deshacer.</p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="cerrarModal()">Cancelar</button>
+      <button class="btn btn-danger" id="modalConfirmBtn" onclick="">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL IMPORTACIÓN ── -->
+<div id="modalImport" onclick="if(event.target===this)cerrarImport()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:280;align-items:center;justify-content:center;backdrop-filter:blur(3px)">
+  <div style="background:white;border-radius:10px;width:700px;max-width:95%;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,0.3);animation:popIn 0.18s ease">
+    <!-- Header -->
+    <div style="padding:20px 24px 16px;border-bottom:var(--border);background:var(--az);color:white;border-radius:10px 10px 0 0;display:flex;justify-content:space-between;align-items:flex-start">
+      <div>
+        <h2 id="importTitle" style="font-size:16px;font-weight:700">📥 Importar alumnado</h2>
+        <p id="importSubtitle" style="font-size:12px;opacity:0.75;margin-top:3px">Formatos admitidos: .xlsx, .xls, .csv</p>
+      </div>
+      <button class="close-btn" onclick="cerrarImport()">✕</button>
+    </div>
+
+    <!-- Plantillas descarga -->
+    <div id="importPlantillas" style="padding:14px 24px;background:var(--az-light);border-bottom:var(--border);display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <span style="font-size:12px;font-weight:600;color:var(--az)">📄 Descargar plantilla:</span>
+      <button id="btnPlantillaXlsx" class="btn btn-sm btn-secondary" onclick="descargarPlantilla('xlsx')">⬇ Excel (.xlsx)</button>
+      <button id="btnPlantillaCsv"  class="btn btn-sm btn-ghost"      onclick="descargarPlantilla('csv')">⬇ CSV (.csv)</button>
+      <span style="font-size:11px;color:var(--gray3);margin-left:4px">Rellena la plantilla y súbela aquí</span>
+    </div>
+
+    <!-- Drop zone -->
+    <div style="padding:20px 24px;overflow-y:auto;flex:1;min-height:0">
+      <div id="dropZone"
+        ondragover="event.preventDefault();this.classList.add('drag-over')"
+        ondragleave="this.classList.remove('drag-over')"
+        ondrop="onDropFile(event)"
+        onclick="document.getElementById('fileImportInput').click()"
+        style="border:2px dashed var(--gray5);border-radius:8px;padding:32px 20px;text-align:center;cursor:pointer;transition:all 0.2s;background:var(--gray7)">
+        <div style="font-size:32px;margin-bottom:8px">📂</div>
+        <div style="font-size:14px;font-weight:600;color:var(--gray2);margin-bottom:4px">Arrastra el fichero aquí o haz clic para seleccionar</div>
+        <div style="font-size:12px;color:var(--gray4)">.xlsx · .xls · .csv</div>
+        <input type="file" id="fileImportInput" accept=".xlsx,.xls,.csv" style="display:none" onchange="onFileSelected(event)">
+      </div>
+
+      <!-- Preview -->
+      <div id="importPreview" style="display:none;margin-top:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div>
+            <span style="font-size:13px;font-weight:600" id="importFileName"></span>
+            <span id="importRowCount" style="font-size:12px;color:var(--gray3);margin-left:8px"></span>
+          </div>
+          <button class="btn btn-sm btn-ghost" onclick="resetImport()">✕ Limpiar</button>
+        </div>
+
+        <!-- Mapeo de columnas -->
+        <div id="importMapping" style="margin-bottom:14px;background:var(--gray7);border:var(--border);border-radius:6px;padding:12px">
+          <div style="font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--gray3);margin-bottom:10px">🔗 Mapeo de columnas</div>
+          <div id="mappingGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"></div>
+        </div>
+
+        <!-- Tabla preview -->
+        <div style="font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--gray3);margin-bottom:6px">Vista previa (primeras 5 filas)</div>
+        <div style="overflow:auto;max-height:180px;border:var(--border);border-radius:6px">
+          <table style="width:100%;border-collapse:collapse;font-size:12px" id="previewTable"></table>
+        </div>
+
+        <!-- Errores -->
+        <div id="importErrors" style="display:none;margin-top:10px;background:var(--red-light);border:1px solid #FFBBB0;border-radius:6px;padding:10px 14px">
+          <div style="font-size:12px;font-weight:600;color:var(--red);margin-bottom:6px">⚠️ Advertencias encontradas:</div>
+          <ul id="errorList" style="font-size:12px;color:var(--red);padding-left:16px;line-height:1.8"></ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div style="padding:14px 24px;border-top:var(--border);background:var(--gray7);display:flex;justify-content:space-between;align-items:center;border-radius:0 0 10px 10px">
+      <span id="importStatusMsg" style="font-size:12px;color:var(--gray3)"></span>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-ghost" onclick="cerrarImport()">Cancelar</button>
+        <button class="btn btn-primary" id="btnImportar" onclick="ejecutarImport()" disabled>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Importar registros
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<div id="toast">✓ <span id="toastMsg"></span></div>
+
+<script>
+
+
+// ── Jerarquía de roles ──
+const ROLE_LEVEL = { admin: 4, tutor: 3, profe: 2, invitado: 1 };
+
+
+
+
+
+// ═════════════════════════════════<script>
+
+
+
+
+// ══════════════════════════════════════════
+//  ESTADO GLOBAL
+// ══════════════════════════════════════════
+let currentUser = null;
+let state = {
+  alumnado:[], empresas:[], pendientes:[], historial:[], usuarios:[],
+  sortField:'apellidos', sortAsc:true, currentTab:'alumnado',
+  get currentRole() { return currentUser?.role||'profesor'; },
+  get estancias() { return this.alumnado.flatMap(a=>(a.estancias||[]).map(e=>({...e,alumnoId:a.id}))); }
+};
+function findEstancia(id) {
+  for (const a of state.alumnado) { const e=(a.estancias||[]).find(e=>e.id===id); if(e) return {...e,alumnoId:a.id}; }
+  return null;
+}
+function updateEstanciaLocal(id,patch) {
+  for (const a of state.alumnado) { const i=(a.estancias||[]).findIndex(e=>e.id===id); if(i!==-1){Object.assign(a.estancias[i],patch);return true;} }
+  return false;
+}
+
+// ══════════════════════════════════════════
+//  TABS
+// ══════════════════════════════════════════
+function switchTab(tab) {
+  state.currentTab = tab;
+  ['alumnado','empresas','pendientes','historial','mapa','visitas','usuarios'].forEach(t => {
+    const el = document.getElementById('view-'+t);
+    if (el) el.style.display = t === tab ? 'block' : 'none';
+    document.getElementById('tab-'+t)?.classList.toggle('active', t === tab);
+  });
+  if (tab === 'alumnado')   { limpiarSeleccion?.(); renderTabla(); renderStats(); }
+  if (tab === 'empresas')   renderEmpresas();
+  if (tab === 'pendientes') renderPendientes();
+  if (tab === 'historial')  renderHistorial();
+  if (tab === 'mapa')       iniciarMapa();
+  if (tab === 'visitas')    cargarVisitas();
+  if (tab === 'usuarios')   { cargarYMostrarUsuarios(); }
+  actualizarContadores();
+}
+
+async function cargarYMostrarUsuarios() {
+  try {
+    const { users } = await Users.list();
+    state.usuarios = users;
+    renderUsuarios();
+    actualizarContadores();
+  } catch(err) {
+    toast('Error al cargar usuarios: ' + err.message, 'error');
+  }
+}
+
+// ══════════════════════════════════════════
+//  STATS
+// ══════════════════════════════════════════
+function renderStats() {
+  const alActivos  = state.alumnado.filter(a => !a.deleted);
+  const estActivas = state.estancias.filter(e => !e.deleted);
+  const cursoActual = [...new Set(estActivas.map(e=>e.curso))].sort().reverse()[0] || '2024-2025';
+  const estCurso   = estActivas.filter(e => e.curso === cursoActual);
+  const empresasAct = new Set(estCurso.map(e=>e.empresaNombre)).size;
+  document.getElementById('statsBar').innerHTML = `
+    <div class="stat-card"><div class="stat-num">${alActivos.length}</div><div class="stat-label">Alumnos totales</div></div>
+    <div class="stat-card"><div class="stat-num">${estCurso.length}</div><div class="stat-label">Estancias ${cursoActual}</div></div>
+    <div class="stat-card"><div class="stat-num">${empresasAct}</div><div class="stat-label">Empresas activas</div></div>
+    <div class="stat-card"><div class="stat-num">${estActivas.length}</div><div class="stat-label">Total estancias</div></div>
+  `;
+}
+
+// ══════════════════════════════════════════
+//  TABLA ALUMNADO
+// ══════════════════════════════════════════
+function renderTabla() {
+  const q        = (document.getElementById('searchInput')?.value  || '').toLowerCase();
+  const fCurso   = document.getElementById('filterCurso')?.value   || '';
+  const fFamilia = document.getElementById('filterFamilia')?.value || '';
+  const fNivel   = document.getElementById('filterNivel')?.value   || '';
+  const fEmpresa = document.getElementById('filterEmpresa')?.value || '';
+  const fAnio    = document.getElementById('filterAnio')?.value    || '';
+
+  let filas = state.alumnado.filter(a => !a.deleted).map(a => {
+    const ests = state.estancias.filter(e => !e.deleted && e.alumnoId === a.id)
+                   .sort((x,y) => (y.curso||'').localeCompare(x.curso||''));
+    return { ...a, estancias: ests, ultima: ests[0] || null };
+  });
+
+  filas = filas.filter(f => {
+    const txt = `${f.apellidos} ${f.nombre} ${f.dni} ${f.familia||''} ${f.estancias.map(e=>`${e.curso} ${e.nivel||''} ${e.empresaNombre||''} ${e.empresaCif||''} ${e.obsAlumno||''}`).join(' ')}`.toLowerCase();
+    return (!q       || txt.includes(q))
+      && (!fFamilia  || (f.familia||'') === fFamilia)
+      && (!fCurso    || f.estancias.some(e=>e.curso===fCurso))
+      && (!fNivel    || f.estancias.some(e=>(e.nivel||'')===fNivel))
+      && (!fEmpresa  || f.estancias.some(e=>e.empresaNombre===fEmpresa))
+      && (!fAnio     || f.estancias.some(e=>(e.periodoIni||'').startsWith(fAnio)));
+  });
+
+  filas.sort((a,b) => {
+    let av = a[state.sortField] ?? a.ultima?.[state.sortField] ?? '';
+    let bv = b[state.sortField] ?? b.ultima?.[state.sortField] ?? '';
+    if (typeof av==='string') av=av.toLowerCase();
+    if (typeof bv==='string') bv=bv.toLowerCase();
+    return state.sortAsc ? (av>bv?1:-1) : (av<bv?1:-1);
+  });
+
+  const tbody=document.getElementById('tablaBody'), empty=document.getElementById('tablaEmpty'), footer=document.getElementById('tablaFooter');
+  if (!filas.length) { tbody.innerHTML=''; empty.style.display='block'; footer.textContent=''; return; }
+  empty.style.display='none';
+  footer.textContent=`Mostrando ${filas.length} de ${state.alumnado.filter(a=>!a.deleted).length} alumnos`;
+
+  const NC={'1CFGB':'#6B4FBB','2CFGB':'#6B4FBB','1CFGM':'#1A7A3C','2CFGM':'#1A7A3C','1CFGS':'#003DA5','2CFGS':'#003DA5','CE':'#8B6000'};
+  const NB={'1CFGB':'#F0ECFF','2CFGB':'#F0ECFF','1CFGM':'#E6F4ED','2CFGM':'#E6F4ED','1CFGS':'#E8EFFF','2CFGS':'#E8EFFF','CE':'#FFF4E0'};
+  const fS = f => (f||'').replace('INFORMÁTICA Y COMUNICACIONES','INFORMÁTICA').replace('ADMINISTRACIÓN Y GESTIÓN','ADMIN.').replace('ELECTRICIDAD Y ELECTRÓNICA','ELECTR.').replace('INSTALACIÓN Y MANTENIMIENTO','INSTALACIÓN').replace('SERVICIOS SOCIOCULTURALES','SS.SS.').replace('HOSTELERÍA Y TURISMO','HOSTELERÍA').replace('EDIFICACIÓN Y OBRA CIVIL','EDIF.').replace('FABRICACIÓN MECÁNICA','MECÁNICA').replace('TRANSPORTE Y MANTENIMIENTO DE VEHÍCULOS','TRANSP.').replace('IMAGEN PERSONAL','IMAGEN').replace('ARTES GRÁFICAS','A.GRÁF.');
+
+  // Show/hide select-all checkbox based on role
+  const cbAllEl = document.getElementById('cbAll');
+  if (cbAllEl) cbAllEl.style.display = canValidate() ? 'block' : 'none';
+
+  tbody.innerHTML = filas.map(f => {
+    const u=f.ultima, n=f.estancias.length;
+    const sel = seleccion.has(f.id);
+    return `
+    <tr class="${sel?'selected-row':''}">
+      <td style="padding:8px 8px 8px 14px;width:32px">${canValidate()?`<input type="checkbox" class="cb-row" data-id="${f.id}" ${sel?'checked':''} onclick="toggleSelRow(${f.id},this)">`:'&nbsp;'}</td>
+      <td class="mono" style="color:var(--gray4);width:40px">${String(f.id).padStart(3,'0')}</td>
+      <td style="min-width:160px">
+        <div class="cell-name">${f.apellidos}, ${f.nombre}</div>
+        <div class="mono" style="font-size:11px;color:var(--gray4)">${f.dni}</div>
+      </td>
+      <td class="hide-mobile" style="min-width:140px;font-size:11px;color:var(--gray3)">${fS(f.familia)||'—'}</td>
+      <td style="min-width:110px">
+        ${u?`<span class="badge badge-curso" style="display:inline-block;margin-bottom:3px">${u.curso}</span>
+             <span class="badge" style="display:inline-block;background:${NB[u.nivel]||'var(--gray6)'};color:${NC[u.nivel]||'var(--gray3)'}">${u.nivel||'—'}</span>`
+          :'<span style="color:var(--gray4);font-size:12px">Sin estancias</span>'}
+        ${n>1?`<div style="font-size:10px;color:var(--az);margin-top:3px;cursor:pointer" onclick="abrirPanelAlumno(${f.id})">📅 ${n} estancias</div>`:''}
+      </td>
+      <td style="min-width:130px">
+        ${u?`<div class="cell-empresa">${u.empresaNombre||'—'}</div>
+             <div class="mono" style="font-size:11px;color:var(--gray4)">${u.empresaCif||''}</div>`
+          :'<span style="color:var(--gray4);font-size:12px">—</span>'}
+      </td>
+      <td class="hide-mobile" style="font-size:12px;color:var(--gray3);min-width:100px">
+        ${u&&u.periodoIni?`${formatFecha(u.periodoIni)} \u2192<br>${formatFecha(u.periodoFin)}`:'—'}
+      </td>
+      <td class="hide-mobile" style="font-size:12px;color:var(--gray3);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(u?.obsAlumno||'')}">
+        ${u?.obsAlumno?'📝 '+u.obsAlumno:'—'}
+      </td>
+      <td style="min-width:110px">
+        <div style="display:flex;gap:4px;align-items:center">
+          <button class="btn btn-sm btn-secondary" title="Ver/editar alumno y sus estancias FEOE" onclick="abrirPanelAlumno(${f.id})">✏️ Editar</button>
+          ${isAdmin()?`<button class="btn btn-sm btn-danger" title="Solicitar eliminación de este alumno y todas sus estancias" onclick="solicitarEliminar('alumno',${f.id},'${esc(f.apellidos+' '+f.nombre)}')">🗑</button>`:''}
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function sortBy(field) {
+  if (state.sortField === field) state.sortAsc = !state.sortAsc;
+  else { state.sortField = field; state.sortAsc = true; }
+  document.querySelectorAll('th').forEach(th => th.classList.remove('sorted'));
+  renderTabla();
+}
+
+function formatFecha(d) {
+  if (!d) return '—';
+  const [y,m,day] = d.split('-');
+  return `${day}/${m}/${y}`;
+}
+
+function esc(s) { const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML.replace(/"/g,'\x22'); }
+
+// ══════════════════════════════════════════
+//  SELECCIÓN MÚLTIPLE (solo admin)
+// ══════════════════════════════════════════
+let seleccion = new Set(); // ids de alumnos seleccionados (de la vista actual)
+
+function toggleSelRow(id, cb) {
+  if (cb.checked) seleccion.add(id);
+  else seleccion.delete(id);
+  actualizarBarraSeleccion();
+  // Actualizar estilo fila sin re-render
+  const fila = cb.closest('tr');
+  if (fila) fila.classList.toggle('selected-row', cb.checked);
+}
+
+function toggleSelAll(cbAll) {
+  // Selecciona/deselecciona solo las filas visibles en la tabla
+  document.querySelectorAll('#tablaBody input.cb-row').forEach(cb => {
+    const id = parseInt(cb.dataset.id);
+    cb.checked = cbAll.checked;
+    if (cbAll.checked) seleccion.add(id); else seleccion.delete(id);
+    cb.closest('tr')?.classList.toggle('selected-row', cbAll.checked);
+  });
+  actualizarBarraSeleccion();
+}
+
+function actualizarBarraSeleccion() {
+  const bar = document.getElementById('seleccionBar');
+  const cnt = document.getElementById('selCount');
+  if (!bar) return;
+  if (seleccion.size > 0 && canValidate()) {
+    bar.classList.add('visible');
+    cnt.textContent = seleccion.size;
+  } else {
+    bar.classList.remove('visible');
+  }
+  // Sincronizar cbAll
+  const cbAll = document.getElementById('cbAll');
+  const total = document.querySelectorAll('#tablaBody input.cb-row').length;
+  if (cbAll) cbAll.indeterminate = seleccion.size > 0 && seleccion.size < total;
+  if (cbAll) cbAll.checked = total > 0 && seleccion.size === total;
+}
+
+function limpiarSeleccion() {
+  seleccion.clear();
+  document.querySelectorAll('#tablaBody input.cb-row').forEach(cb => {
+    cb.checked = false;
+    cb.closest('tr')?.classList.remove('selected-row');
+  });
+  const cbAll = document.getElementById('cbAll');
+  if (cbAll) { cbAll.checked = false; cbAll.indeterminate = false; }
+  actualizarBarraSeleccion();
+}
+
+function actualizarFiltros() {
+  const estActivas = state.estancias.filter(e=>!e.deleted);
+  const alActivos  = state.alumnado.filter(a=>!a.deleted);
+  const cursos   = [...new Set(estActivas.map(e=>e.curso))].sort().reverse();
+  const familias = [...new Set(alActivos.map(a=>a.familia||'').filter(Boolean))].sort();
+  const empresas = [...new Set(estActivas.map(e=>e.empresaNombre).filter(Boolean))].sort();
+  const anios    = [...new Set(estActivas.filter(e=>e.periodoIni).map(e=>e.periodoIni.substring(0,4)))].sort().reverse();
+  const selC=document.getElementById('filterCurso'), selF=document.getElementById('filterFamilia'),
+        selE=document.getElementById('filterEmpresa'), selA=document.getElementById('filterAnio');
+  if (!selC) return;
+  const cv=selC.value,fv=selF?.value||'',ev=selE.value,av=selA.value;
+  selC.innerHTML = '<option value="">Todos los cursos</option>'   + cursos.map(c=>`<option ${c===cv?'selected':''}>${c}</option>`).join('');
+  if(selF) selF.innerHTML='<option value="">Todas las familias</option>'+familias.map(f=>`<option ${f===fv?'selected':''}>${f}</option>`).join('');
+  selE.innerHTML = '<option value="">Todas las empresas</option>' + empresas.map(e=>`<option ${e===ev?'selected':''}>${e}</option>`).join('');
+  selA.innerHTML = '<option value="">Todos los años</option>'     + anios.map(a=>`<option ${a===av?'selected':''}>${a}</option>`).join('');
+}
+
+function actualizarContadores() {
+  document.getElementById('cnt-alumnado').textContent   = state.alumnado.filter(a=>!a.deleted).length;
+  document.getElementById('cnt-empresas').textContent   = state.empresas.filter(e=>!e.deleted).length;
+  document.getElementById('cnt-pendientes').textContent = state.pendientes.filter(p=>!p.resuelto).length;
+}
+
+// ══════════════════════════════════════════
+//  PANEL ALUMNO — datos personales + estancias
+// ══════════════════════════════════════════
+function abrirPanelAlumno(id) {
+  const isNew = id === null;
+  document.getElementById('panelAlumnoTitle').textContent = isNew ? 'Nuevo alumno' : 'Editar alumno';
+  document.getElementById('panelAlumnoSub').textContent   = isNew ? 'Datos personales del alumno/a' : `Alumno #${String(id).padStart(3,'0')} — datos y estancias FEOE`;
+  const empSel = document.getElementById('aEmpresa');
+  if (empSel) {
+    empSel.innerHTML = '<option value="" style="background:white;color:var(--gray3)">— Seleccionar empresa registrada —</option>'
+      + state.empresas.filter(e=>!e.deleted)
+          .map(e=>'<option value="'+e.id+'" style="background:white;color:var(--gray1)">'+escHtml(e.nombre)+' ('+escHtml(e.cif)+')</option>')
+          .join('');
+  }
+
+  if (isNew) {
+    document.getElementById('alumnoId').value = '';
+    ['aApellidos','aNombre','aDni'].forEach(f=>document.getElementById(f).value='');
+    document.getElementById('aFamilia').value = '';
+    document.getElementById('seccionEstancias').style.display = 'none';
+    mostrarFormEstancia(null);
+  } else {
+    const a = state.alumnado.find(x => x.id === id);
+    document.getElementById('alumnoId').value   = a.id;
+    document.getElementById('aApellidos').value = a.apellidos;
+    document.getElementById('aNombre').value    = a.nombre;
+    document.getElementById('aDni').value       = a.dni;
+    document.getElementById('aFamilia').value   = a.familia || '';
+    document.getElementById('seccionEstancias').style.display = 'block';
+    renderListaEstancias(a.id);
+    mostrarFormEstancia(null);
+  }
+  document.getElementById('overlayAlumno')?.classList.add('open');
+}
+
+function renderListaEstancias(alumnoId) {
+  const _ral = state.alumnado.find(a => a.id === alumnoId);
+  const ests = (_ral?.estancias||[]).filter(e=>!e.deleted).sort((a,b)=>(b.curso||'').localeCompare(a.curso||''));
+  const el = document.getElementById('listaEstancias');
+
+  // Update badge count
+  const badge = document.getElementById('badgeNumEstancias');
+  if (badge) badge.textContent = ests.length ? ests.length + (ests.length===1?' estancia':' estancias') : '';
+
+  // Show/hide Nueva estancia button (only for write roles)
+  const btnNueva = document.getElementById('btnNuevaEstancia');
+  if (btnNueva) btnNueva.style.display = canWrite() ? 'inline-flex' : 'none';
+
+  if (!ests.length) {
+    el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--gray4);font-size:13px;border:2px dashed var(--gray5);border-radius:8px">'
+      + (canWrite() ? '📋 Sin estancias. Pulsa <b>Nueva estancia</b> al inicio del curso para registrar la primera FEOE.' : '📋 Sin estancias registradas.')
+      + '</div>';
+    return;
+  }
+
+  el.innerHTML = ests.map((e, idx) => {
+    const nV = e.numSeguimientos||0;
+    const nP = e.numPendientesValidacion||0;
+    const isActive = idx === 0; // most recent
+
+    // Visitas semaphore
+    const visitColor = nV===0 ? 'var(--red)' : nV<2 ? '#8B6000' : 'var(--green)';
+    const visitBg    = nV===0 ? 'var(--red-light)' : nV<2 ? '#FFF4E0' : 'var(--green-light)';
+    const visitIcon  = nV===0 ? '⚠' : nV<2 ? '⏳' : '✓';
+    const visitText  = nV===0 ? '0 visitas' : nV+' visita'+(nV!==1?'s':'');
+
+    return '<div style="border:1px solid var(--gray5);border-radius:10px;margin-bottom:10px;overflow:hidden;box-shadow:var(--shadow)"'
+      + (isActive ? ' id="estanciaCard_active"' : '') + '>'
+
+      // ── Cabecera de tarjeta: empresa destacada ──
+      + '<div style="background:var(--az);padding:12px 16px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px">'
+        + '<div style="flex:1;min-width:0">'
+          + '<div style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.55);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:3px">Empresa</div>'
+          + '<div style="font-family:\'Crimson Pro\',serif;font-size:18px;font-weight:600;color:white;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'
+          + (e.empresaNombre ? escHtml(e.empresaNombre) : '<span style="opacity:0.45;font-style:italic">Sin empresa asignada</span>')
+          + '</div>'
+          + (e.empresaCif ? '<div style="font-size:11px;color:rgba(255,255,255,0.5);font-family:monospace;margin-top:2px">'+escHtml(e.empresaCif)+'</div>' : '')
+        + '</div>'
+        // Badges curso + nivel
+        + '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">'
+          + '<span class="badge badge-curso" style="font-size:12px">'+escHtml(e.curso)+'</span>'
+          + (e.nivel ? '<span class="badge" style="background:rgba(255,255,255,0.15);color:white;font-size:11px">'+escHtml(e.nivel)+'</span>' : '')
+        + '</div>'
+      + '</div>'
+
+      // ── Cuerpo de tarjeta ──
+      + '<div style="padding:12px 16px;background:white">'
+        // Info fila: periodo + contacto
+        + '<div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:10px;font-size:12px;color:var(--gray3)">'
+          + (e.periodoIni
+              ? '<span>📅 '+formatFecha(e.periodoIni)+' → '+formatFecha(e.periodoFin)+'</span>'
+              : '<span style="color:var(--gray4)">📅 Sin periodo</span>')
+          + (e.contacto ? '<span>👤 '+escHtml(e.contacto)+'</span>' : '')
+          + (e.supervisorNombre ? '<span>🎓 '+escHtml(e.supervisorNombre)+'</span>' : '')
+        + '</div>'
+
+        // Badges estado
+        + '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px">'
+          // Calificación
+          + (e.calificacion
+              ? '<span style="display:inline-flex;align-items:center;gap:4px;background:rgba(200,168,75,0.15);color:#7a5900;border:1px solid rgba(200,168,75,0.4);border-radius:5px;padding:3px 10px;font-size:12px;font-weight:700">📝 '+escHtml(e.calificacion)+'</span>'
+              : '<span style="display:inline-flex;align-items:center;gap:4px;background:var(--gray6);color:var(--gray4);border-radius:5px;padding:3px 10px;font-size:11px">Sin calificar</span>')
+          // Visitas semáforo
+          + '<span style="display:inline-flex;align-items:center;gap:5px;background:'+visitBg+';color:'+visitColor+';border-radius:5px;padding:3px 10px;font-size:12px;font-weight:700">'
+            + visitIcon+' '+visitText
+            + (nP>0 ? ' · <span style="font-weight:400;font-size:10px">'+nP+' pend. validar</span>' : '')
+          + '</span>'
+          + (e.deletePending ? '<span class="badge badge-pend">⏳ Pendiente borrado</span>' : '')
+        + '</div>'
+
+        // Observaciones si hay
+        + (e.obsAlumno ? '<div style="font-size:12px;color:var(--gray2);background:var(--gray7);border-radius:5px;padding:6px 10px;margin-bottom:10px">📝 '+escHtml(e.obsAlumno)+'</div>' : '')
+
+        // Acciones
+        + (canWrite()
+            ? '<div style="display:flex;gap:6px">'
+              + '<button class="btn btn-sm btn-secondary" onclick="mostrarFormEstancia('+e.id+')">'
+                + '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>'
+                + ' Editar estancia'
+              + '</button>'
+              + (!e.deletePending
+                  ? '<button class="btn btn-sm btn-ghost" style="color:var(--red)" onclick="solicitarEliminarEstancia('+e.id+')">🗑 Borrar</button>'
+                  : '<span class="badge badge-pend">⏳ Pendiente borrado</span>')
+            + '</div>'
+            : '')
+      + '</div>'
+    + '</div>';
+  }).join('');
+}
+
+
+function solicitarNuevaEstancia() {
+  const alumnoId = parseInt(document.getElementById('alumnoId').value);
+  const ests = (state.alumnado.find(a=>a.id===alumnoId)?.estancias||[]).filter(e=>!e.deleted);
+
+  // Check if there's already one for the current course
+  const cursosActuales = ['2025-2026', '2024-2025'];
+  const yaExiste = ests.some(e => cursosActuales.includes(e.curso));
+
+  if (yaExiste) {
+    // Warn but allow
+    confirmar(
+      '⚠ Ya existe estancia este curso',
+      'Este alumno ya tiene una estancia registrada en el curso actual.\n\nLas estancias FEOE se asignan al inicio del curso.\n\n¿Deseas añadir otra igualmente?',
+      () => mostrarFormEstancia(null)
+    );
+  } else {
+    mostrarFormEstancia(null);
+  }
+}
+
+
+function mostrarFormEstancia(estanciaId) {
+  document.getElementById('estanciaId').value = estanciaId || '';
+  document.getElementById('formEstanciaTitulo').textContent = estanciaId ? '✏️ Editar estancia' : '➕ Nueva estancia FEOE';
+  document.getElementById('btnsCancelarEstancia').style.display = estanciaId ? 'block' : 'none';
+  if (estanciaId) {
+    const e = findEstancia(estanciaId);
+    document.getElementById('aCurso').value         = e.curso || '';
+    document.getElementById('aNivel').value         = e.nivel || '';
+    document.getElementById('aEmpresa').value       = e.empresaId || '';
+    document.getElementById('aEmpresaNombre').value = e.empresaNombre || '';
+    document.getElementById('aEmpresaCif').value    = e.empresaCif || '';
+    document.getElementById('aPeriodoIni').value    = e.periodoIni || '';
+    document.getElementById('aPeriodoFin').value    = e.periodoFin || '';
+    document.getElementById('aContacto').value      = e.contacto || '';
+    document.getElementById('aObsEmpresa').value    = e.obsEmpresa || '';
+    document.getElementById('aObsAlumno').value     = e.obsAlumno || '';
+  } else {
+    ['aEmpresaNombre','aEmpresaCif','aPeriodoIni','aPeriodoFin','aContacto','aObsEmpresa','aObsAlumno'].forEach(f=>document.getElementById(f).value='');
+    document.getElementById('aCurso').value='2024-2025';
+    document.getElementById('aNivel').value='';
+    document.getElementById('aEmpresa').value='';
+  }
+  const fe = document.getElementById('formEstancia');
+  if (fe) { fe.style.display = 'block'; fe.scrollIntoView({behavior:'smooth',block:'nearest'}); }
+  // Cargar seguimientos si es edicion
+  const segCont = document.getElementById('seguimientosContainer');
+  if (estanciaId && segCont) {
+    segCont.style.display = 'block';
+    cargarSeguimientos(estanciaId);
+  } else if (segCont) {
+    segCont.style.display = 'none';
+    if (typeof _currentEstanciaId !== 'undefined') { _currentEstanciaId=null; _seguimientosCache=[]; }
+    const sl = document.getElementById('seguimientosList'); if(sl) sl.innerHTML='';
+    const sf = document.getElementById('formSeguimiento'); if(sf) sf.style.display='none';
+  }
+}
+
+function cancelarFormEstancia() {
+  const fe = document.getElementById('formEstancia');
+  if (fe) fe.style.display = 'none';
+  const seg = document.getElementById('seguimientosContainer');
+  if (seg) seg.style.display = 'none';
+  _currentEstanciaId = null; _seguimientosCache = [];
+  const sl = document.getElementById('seguimientosList'); if(sl) sl.innerHTML = '';
+  const sf = document.getElementById('formSeguimiento'); if(sf) sf.style.display = 'none';
+}
+
+function autocompletarEmpresa() {
+  const id = parseInt(document.getElementById('aEmpresa').value);
+  const emp = state.empresas.find(e => e.id === id);
+  if (emp) {
+    document.getElementById('aEmpresaNombre').value = emp.nombre;
+    document.getElementById('aEmpresaCif').value    = emp.cif;
+    document.getElementById('aContacto').value      = [emp.contactoNombre, emp.contactoCargo, emp.contactoTel].filter(Boolean).join(' — ');
+    document.getElementById('aObsEmpresa').value    = emp.obs || '';
+  }
+}
+
+function abrirPanelEmpresa(id) {
+  document.getElementById('panelEmpresaTitle').textContent = id === null ? 'Nueva empresa' : 'Editar empresa';
+  if (id === null) {
+    ['empresaId','eNombre','eCif','eSector','eDireccion','eContactoNombre','eContactoCargo','eContactoTel','eContactoEmail','eObs'].forEach(f => document.getElementById(f).value = '');
+  } else {
+    const e = state.empresas.find(x => x.id === id);
+    document.getElementById('empresaId').value = e.id;
+    document.getElementById('eNombre').value = e.nombre;
+    document.getElementById('eCif').value = e.cif;
+    document.getElementById('eSector').value = e.sector || '';
+    document.getElementById('eDireccion').value = e.direccion || '';
+    document.getElementById('eContactoNombre').value = e.contactoNombre || '';
+    document.getElementById('eContactoCargo').value = e.contactoCargo || '';
+    document.getElementById('eContactoTel').value = e.contactoTel || '';
+    document.getElementById('eContactoEmail').value = e.contactoEmail || '';
+    document.getElementById('eObs').value = e.obs || '';
+  }
+  document.getElementById('overlayEmpresa')?.classList.add('open');
+}
+
+function renderEmpresas() {
+  const q = (document.getElementById('searchEmpresa')?.value || '').toLowerCase();
+  const container = document.getElementById('empresasContainer');
+  let empresas = state.empresas.filter(e => !e.deleted);
+  if (q) {
+    empresas = empresas.filter(e => `${e.nombre} ${e.cif} ${e.contactoNombre} ${e.contactoEmail} ${e.sector}`.toLowerCase().includes(q));
+  }
+
+  if (!empresas.length) {
+    container.innerHTML = '<div class="empty-state"><p>No se encontraron empresas.</p></div>';
+    return;
+  }
+
+  container.innerHTML = empresas.map(e => {
+    // Agrupar estancias de esta empresa por curso
+    const ests = state.estancias.filter(s => !s.deleted && s.empresaId === e.id);
+    const byYear = {};
+    ests.forEach(s => {
+      const a = state.alumnado.find(x=>x.id===s.alumnoId && !x.deleted);
+      if (!a) return;
+      if (!byYear[s.curso]) byYear[s.curso] = [];
+      byYear[s.curso].push({...s, apellidos:a.apellidos, nombre:a.nombre, dni:a.dni});
+    });
+
+    // Estado mapa
+    const tieneDir    = e.direccion && e.direccion.trim();
+    const tieneCoords = e.lat && e.lon;
+    let mapaBadge = '';
+    if (tieneCoords) {
+      mapaBadge = `<span title="Visible en el mapa" style="display:inline-flex;align-items:center;gap:3px;background:#E6F4ED;color:#1A7A3C;border-radius:20px;padding:2px 8px;font-size:11px;font-weight:600;cursor:pointer" onclick="event.stopPropagation();switchTab('mapa')">📍 En el mapa</span>`;
+    } else if (tieneDir) {
+      mapaBadge = `<span title="Tiene dirección pero aún no se ha geocodificado. Ve al Mapa y pulsa Geocodificar." style="display:inline-flex;align-items:center;gap:3px;background:#FFF4E0;color:#8B6000;border-radius:20px;padding:2px 8px;font-size:11px;font-weight:600;cursor:pointer" onclick="event.stopPropagation();switchTab('mapa')">⏳ Geocodificar</span>`;
+    } else {
+      mapaBadge = `<span title="Sin dirección — no puede mostrarse en el mapa. Edita la ficha." style="display:inline-flex;align-items:center;gap:3px;background:#FDECEA;color:#CC2200;border-radius:20px;padding:2px 8px;font-size:11px;font-weight:600;cursor:pointer" onclick="event.stopPropagation();abrirPanelEmpresa(${e.id})">⚠️ Sin dirección</span>`;
+    }
+
+    return `
+    <div class="empresa-card">
+      <div class="empresa-card-header" onclick="toggleEmpCard(${e.id})">
+        <div>
+          <div class="empresa-name">🏢 ${e.nombre}</div>
+          <div class="empresa-meta mono">${e.cif}${e.sector ? ` · ${e.sector}` : ''}${e.direccion ? ` · ${e.direccion}` : '<span style="color:var(--red)"> · Sin dirección</span>'}</div>
+          ${e.contactoNombre ? `<div class="empresa-meta">👤 ${e.contactoNombre}${e.contactoCargo?' ('+e.contactoCargo+')':''}${e.contactoTel?' · '+e.contactoTel:''}</div>` : ''}
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+          ${mapaBadge}
+          <span class="badge badge-curso">${ests.length} estancias</span>
+          <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation();abrirPanelEmpresa(${e.id})">✏️ Editar</button>
+          ${isAdmin() ? `<!-- empresa del btn placeholder',${e.id},'${esc(e.nombre)}')">🗑</button>` : ''}
+        </div>
+      </div>
+      <div class="empresa-card-body" id="empcard-${e.id}" style="display:none">
+        ${e.obs ? `<div style="padding:10px 14px;font-size:12px;color:var(--gray2);background:var(--gold-light);border-bottom:var(--border)">📝 ${e.obs}</div>` : ''}
+        ${Object.keys(byYear).sort().reverse().map(curso => `
+          <div style="padding:8px 14px;font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--gray3);background:var(--gray7);border-bottom:var(--border)">
+            Curso ${curso}
+          </div>
+          <table class="empresa-alumnos">
+            ${byYear[curso].map(a => `
+              <tr>
+                <td class="mono" style="color:var(--gray4);width:40px">${a.nivel||'—'}</td>
+                <td style="font-weight:500">${a.apellidos}, ${a.nombre}</td>
+                <td class="mono" style="color:var(--gray3)">${a.dni}</td>
+                <td style="color:var(--gray3)">${a.periodoIni ? formatFecha(a.periodoIni)+' → '+formatFecha(a.periodoFin) : '—'}</td>
+                <td style="color:var(--gray2);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${a.obsAlumno || '—'}</td>
+                <td><button class="btn btn-sm btn-ghost" onclick="abrirPanelAlumno(${a.alumnoId})">✏️</button></td>
+              </tr>
+            `).join('')}
+          </table>
+        `).join('')}
+        ${!ests.length ? `<div style="padding:14px;text-align:center;font-size:12px;color:var(--gray4)">Sin alumnado registrado en esta empresa.</div>` : ''}
+      </div>
+    </div>
+    `;
+  }).join('');
+}
+
+function toggleEmpCard(id) {
+  const el = document.getElementById(`empcard-${id}`);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+// ══════════════════════════════════════════
+//  ELIMINACIONES PENDIENTES
+// ══════════════════════════════════════════
+function renderPendientes() {
+  const list = document.getElementById('pendientesList');
+  const pendientes = state.pendientes.filter(p => !p.resuelto);
+
+  if (!pendientes.length) {
+    list.innerHTML = `<div class="empty-state"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg><p>No hay solicitudes pendientes.</p></div>`;
+    return;
+  }
+
+  list.innerHTML = `
+    <div class="pending-section">
+      <h3>⚠️ ${pendientes.length} solicitud(es) pendiente(s) de revisión</h3>
+      ${pendientes.map(p => `
+        <div class="pending-item">
+          <div>
+            <strong>${p.tipo === 'alumno' ? '👤' : p.tipo === 'estancia' ? '📅' : '🏢'} ${p.nombre}</strong>
+            <div style="font-size:11px;color:var(--gray3);margin-top:2px">
+              Solicitado por <b>${p.solicitante}</b> · ${formatFechaHora(p.fecha)}
+            </div>
+          </div>
+          ${canValidate() ? `
+            <div class="pending-actions">
+              <button class="btn btn-sm" style="background:var(--green);color:white" onclick="resolverPendiente(${p.id},true)">✓ Aprobar</button>
+              <button class="btn btn-sm btn-ghost" onclick="resolverPendiente(${p.id},false)">✕ Rechazar</button>
+            </div>
+          ` : `<span class="badge badge-pend">⏳ Esperando admin</span>`}
+        </div>
+      `).join('')}
+    </div>
+    ${state.pendientes.filter(p=>p.resuelto).length > 0 ? `
+      <div style="margin-top:16px">
+        <div style="font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--gray3);margin-bottom:8px">Historial resueltos</div>
+        ${state.pendientes.filter(p=>p.resuelto).map(p=>`
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:white;border:var(--border);border-radius:4px;margin-bottom:6px;font-size:12px">
+            <span>${p.tipo === 'alumno' ? '👤' : p.tipo === 'estancia' ? '📅' : '🏢'} ${p.nombre}</span>
+            <span class="badge ${p.aprobado ? 'badge-ok' : 'badge-del'}">${p.aprobado ? '✓ Aprobado' : '✕ Rechazado'}</span>
+          </div>
+        `).join('')}
+      </div>
+    ` : ''}
+  `;
+}
+
+function formatFechaHora(iso) {
+  const d = new Date(iso);
+  return d.toLocaleDateString('es-ES') + ' ' + d.toLocaleTimeString('es-ES', {hour:'2-digit',minute:'2-digit'});
+}
+
+// ══════════════════════════════════════════
+//  HISTORIAL
+// ══════════════════════════════════════════
+function renderHistorial() {
+  const q = (document.getElementById('searchHistorial')?.value || '').toLowerCase();
+  const list = document.getElementById('historialList');
+  let h = state.historial;
+  if (q) h = h.filter(x => x.texto.toLowerCase().includes(q) || x.usuario.toLowerCase().includes(q));
+
+  if (!h.length) {
+    list.innerHTML = '<div style="text-align:center;padding:40px;color:var(--gray4)">Sin registros en el historial.</div>';
+    return;
+  }
+
+  list.innerHTML = h.map(x => `
+    <div class="hist-item ${x.tipo}">
+      <div class="hist-time">${formatFechaHora(x.fecha)} · <b>${x.usuario}</b></div>
+      <div>${x.tipo === 'new' ? '🟢' : x.tipo === 'edit' ? '🟡' : '🔴'} ${x.texto}</div>
+    </div>
+  `).join('');
+}
+
+// ══════════════════════════════════════════
+//  ROL
+// ══════════════════════════════════════════
+
+function confirmar(titulo, msg, cb) {
+  document.getElementById('modalTitle').textContent = titulo.replace(/^[^\s]+\s/, '');
+  document.getElementById('modalIcon').textContent = titulo.split(' ')[0];
+  document.getElementById('modalMsg').textContent = msg;
+  _confirmCallback = cb;
+  document.getElementById('modalConfirm')?.classList.add('open');
+}
+document.getElementById('modalConfirmBtn').onclick = () => {
+  cerrarModal();
+  if (_confirmCallback) _confirmCallback();
+};
+function cerrarModal() { document.getElementById('modalConfirm')?.classList.remove('open'); }
+
+function cerrarPanel(id) { document.getElementById(id).classList.remove('open'); }
+function cerrarPaneles(e) { if (e.target.classList.contains('overlay')) e.target.classList.remove('open'); }
+
+// ══════════════════════════════════════════
+//  TOAST
+// ══════════════════════════════════════════
+let _toastTimer;
+function toast(msg, tipo = '') {
+  const el = document.getElementById('toast');
+  const msgEl = document.getElementById('toastMsg');
+  msgEl.textContent = msg;
+  el.className = `show ${tipo}`;
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => el.classList.remove('show'), 3500);
+}
+
+// ══════════════════════════════════════════
+//  IMPORTACIÓN (SheetJS)
+// ══════════════════════════════════════════
+let importTipo = 'alumnado';
+let importParsed = []; // [{colNombre, colValor, ...}]
+let importHeaders = [];
+
+// Campos esperados por tipo
+const CAMPOS = {
+  alumnado: [
+    { key:'apellidos',     label:'Apellidos',            required:true  },
+    { key:'nombre',        label:'Nombre',               required:true  },
+    { key:'dni',           label:'DNI/NIE',              required:true  },
+    { key:'curso',         label:'Curso académico',      required:true  },
+    { key:'familia',       label:'Familia Profesional',  required:false },
+    { key:'nivel',         label:'Nivel / Ciclo',        required:false },
+    { key:'empresaNombre', label:'Empresa',              required:false },
+    { key:'empresaCif',    label:'CIF',                  required:false },
+    { key:'periodoIni',    label:'Periodo Inicio',       required:false },
+    { key:'periodoFin',    label:'Periodo Fin',          required:false },
+    { key:'contacto',      label:'Contacto Empresa',     required:false },
+    { key:'obsEmpresa',    label:'Obs. Empresa',         required:false },
+    { key:'obsAlumno',     label:'Obs. Alumno',          required:false },
+  ],
+  empresas: [
+    { key:'nombre',         label:'Nombre',            required:true  },
+    { key:'cif',            label:'CIF',               required:true  },
+    { key:'sector',         label:'Sector',            required:false },
+    { key:'direccion',      label:'Dirección',         required:false },
+    { key:'contactoNombre', label:'Contacto Nombre',   required:false },
+    { key:'contactoCargo',  label:'Contacto Cargo',    required:false },
+    { key:'contactoTel',    label:'Teléfono',          required:false },
+    { key:'contactoEmail',  label:'Email',             required:false },
+    { key:'obs',            label:'Observaciones',     required:false },
+  ]
+};
+
+// Sinónimos para autodetección de columnas
+const SINONIMOS = {
+  apellidos:      ['apellidos','apellido','surname','last_name','lastname'],
+  nombre:         ['nombre','name','first_name','firstname'],
+  dni:            ['dni','nie','dni_nie','nif','documento'],
+  curso:          ['curso','year','anio','año','curso_academico','academic_year'],
+  familia:        ['familia','familia_profesional','fp','family','ciclo_familia','professional_family'],
+  nivel:          ['nivel','ciclo','nivel_ciclo','grado','level','curso_nivel','tipo_ciclo'],
+  empresaNombre:  ['empresa','empresa_nombre','company','nombre_empresa'],
+  empresaCif:     ['cif','nif_empresa','company_id','cif_empresa'],
+  periodoIni:     ['periodo_inicio','fecha_inicio','start_date','inicio','periodo_ini'],
+  periodoFin:     ['periodo_fin','fecha_fin','end_date','fin','periodo_fin'],
+  contacto:       ['contacto','contacto_empresa','tutor_empresa','contact'],
+  obsEmpresa:     ['obs_empresa','observaciones_empresa','notas_empresa','obs_company'],
+  obsAlumno:      ['obs_alumno','observaciones','obs_alumno','notas','notes','observaciones_alumno'],
+  nombre_e:       ['nombre'],
+  cif:            ['cif','nif'],
+  sector:         ['sector','actividad','industry'],
+  direccion:      ['direccion','address','domicilio'],
+  contactoNombre: ['contacto_nombre','nombre_contacto','contact_name'],
+  contactoCargo:  ['contacto_cargo','cargo','position','role'],
+  contactoTel:    ['contacto_telefono','telefono','phone','tel','contacto_tel'],
+  contactoEmail:  ['contacto_email','email','correo','mail'],
+  obs:            ['observaciones','obs','notas','notes','comments'],
+};
+
+function abrirImport(tipo) {
+  importTipo = tipo;
+  document.getElementById('importTitle').textContent = tipo === 'alumnado' ? '📥 Importar alumnado' : '📥 Importar empresas';
+  document.getElementById('importSubtitle').textContent = `Formatos admitidos: .xlsx, .xls, .csv — ${tipo === 'alumnado' ? 'Alumnado FEOE' : 'Empresas FEOE'}`;
+  resetImport();
+  document.getElementById('modalImport').style.display = 'flex';
+}
+
+function cerrarImport() {
+  document.getElementById('modalImport').style.display = 'none';
+}
+
+function resetImport() {
+  importParsed = [];
+  importHeaders = [];
+  document.getElementById('importPreview').style.display = 'none';
+  document.getElementById('importErrors').style.display = 'none';
+  document.getElementById('fileImportInput').value = '';
+  document.getElementById('btnImportar').disabled = true;
+  document.getElementById('importStatusMsg').textContent = '';
+}
+
+function onDropFile(e) {
+  e.preventDefault();
+  document.getElementById('dropZone')?.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) procesarFichero(file);
+}
+
+function onFileSelected(e) {
+  const file = e.target.files[0];
+  if (file) procesarFichero(file);
+}
+
+function procesarFichero(file) {
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (!['xlsx','xls','csv'].includes(ext)) {
+    toast('Formato no admitido. Usa .xlsx, .xls o .csv', 'error'); return;
+  }
+  document.getElementById('importFileName').textContent = `📄 ${file.name}`;
+  document.getElementById('importStatusMsg').textContent = 'Leyendo fichero…';
+
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    try {
+      let rows;
+      if (ext === 'csv') {
+        rows = parsearCSV(ev.target.result);
+      } else {
+        const wb = XLSX.read(ev.target.result, {type:'array', cellDates:true});
+        // Busca la primera hoja que no se llame INSTRUCCIONES
+        const sheetName = wb.SheetNames.find(n => !n.toLowerCase().includes('instruc')) || wb.SheetNames[0];
+        const ws = wb.Sheets[sheetName];
+        rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:'', raw:false, dateNF:'yyyy-mm-dd'});
+      }
+      if (!rows || rows.length < 2) { toast('El fichero está vacío o sin datos', 'error'); return; }
+
+      // Filtrar filas completamente vacías
+      importHeaders = rows[0].map(h => String(h||'').trim());
+      const dataRows = rows.slice(1).filter(r => r.some(c => String(c||'').trim() !== ''));
+      importParsed = dataRows.map(r => {
+        const obj = {};
+        importHeaders.forEach((h,i) => obj[h] = String(r[i]||'').trim());
+        return obj;
+      });
+
+      document.getElementById('importRowCount').textContent = `${importParsed.length} filas de datos`;
+      mostrarPreview();
+    } catch(err) {
+      toast('Error al leer el fichero: ' + err.message, 'error');
+      console.error(err);
+    }
+  };
+  if (ext === 'csv') reader.readAsText(file, 'UTF-8');
+  else reader.readAsArrayBuffer(file);
+}
+
+function parsearCSV(text) {
+  // Quita BOM si existe
+  if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+  const lines = text.split(/\r?\n/).filter(l => l.trim());
+  return lines.map(line => {
+    const cols = []; let cur = ''; let inQ = false;
+    for (let i=0; i<line.length; i++) {
+      const c = line[i];
+      if (c==='"') { inQ = !inQ; }
+      else if (c===',' && !inQ) { cols.push(cur.trim()); cur=''; }
+      else { cur += c; }
+    }
+    cols.push(cur.trim());
+    return cols;
+  });
+}
+
+function autodetectarColumnas() {
+  const campos = CAMPOS[importTipo];
+  const mapping = {};
+  campos.forEach(campo => {
+    const sinonimos = SINONIMOS[campo.key] || [campo.key.toLowerCase()];
+    const encontrada = importHeaders.find(h => sinonimos.includes(h.toLowerCase().replace(/ /g,'_')));
+    mapping[campo.key] = encontrada || '';
+  });
+  return mapping;
+}
+
+function mostrarPreview() {
+  document.getElementById('importPreview').style.display = 'block';
+  const campos = CAMPOS[importTipo];
+  const autoMap = autodetectarColumnas();
+
+  // Render mapeo
+  const grid = document.getElementById('mappingGrid');
+  grid.innerHTML = campos.map(c => `
+    <div class="map-label ${c.required?'required':''}">${c.label}</div>
+    <select class="map-select ${autoMap[c.key]?'matched':'unmatched'}" id="map_${c.key}" onchange="this.className='map-select '+(this.value?'matched':'unmatched')">
+      <option value="">— sin mapear —</option>
+      ${importHeaders.map(h=>`<option value="${h}" ${h===autoMap[c.key]?'selected':''}>${h}</option>`).join('')}
+    </select>
+  `).join('');
+
+  renderPreviewTable();
+  validarImport();
+}
+
+function renderPreviewTable() {
+  const muestra = importParsed.slice(0,5);
+  const tbl = document.getElementById('previewTable');
+  tbl.innerHTML = `
+    <thead><tr>${importHeaders.map(h=>`<th>${h}</th>`).join('')}</tr></thead>
+    <tbody>${muestra.map(row=>`<tr>${importHeaders.map(h=>`<td title="${esc(row[h]||'')}">${row[h]||''}</td>`).join('')}</tr>`).join('')}</tbody>
+  `;
+}
+
+function validarImport() {
+  const campos = CAMPOS[importTipo];
+  const errores = [];
+  const requeridosMapeados = campos.filter(c=>c.required).every(c => {
+    const sel = document.getElementById(`map_${c.key}`);
+    if (sel && !sel.value) { errores.push(`Campo obligatorio sin mapear: "${c.label}"`); return false; }
+    return true;
+  });
+
+  // Chequeo de datos
+  if (requeridosMapeados) {
+    importParsed.slice(0,20).forEach((row,i)=>{
+      campos.filter(c=>c.required).forEach(c=>{
+        const col = document.getElementById(`map_${c.key}`)?.value;
+        if (col && !row[col]?.trim()) errores.push(`Fila ${i+2}: campo "${c.label}" vacío`);
+      });
+    });
+  }
+
+  const errDiv = document.getElementById('importErrors');
+  if (errores.length) {
+    errDiv.style.display = 'block';
+    document.getElementById('errorList').innerHTML = errores.map(e=>`<li>${e}</li>`).join('');
+  } else {
+    errDiv.style.display = 'none';
+  }
+
+  const puedeImportar = requeridosMapeados && errores.filter(e=>e.includes('obligatorio')).length===0;
+  document.getElementById('btnImportar').disabled = !puedeImportar;
+  document.getElementById('importStatusMsg').textContent = puedeImportar
+    ? `✓ Listo para importar ${importParsed.length} filas — los registros existentes (mismo DNI/CIF) se actualizarán`
+    : 'Revisa el mapeo de columnas obligatorias';
+}
+
+function descargarPlantilla(formato) {
+  const isAlumnado = importTipo === 'alumnado';
+  const nombre = isAlumnado ? 'plantilla_alumnado_FEOE' : 'plantilla_empresas_FEOE';
+  if (formato === 'csv') {
+    const csv = isAlumnado ? PLANTILLAS.alumnado_csv : PLANTILLAS.empresas_csv;
+    const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8'});
+    descargarBlob(blob, nombre+'.csv');
+  } else {
+    const headers = {
+      alumnado: ['Apellidos','Nombre','DNI_NIE','Curso','Familia_Profesional','Nivel_Ciclo','Empresa','CIF','Periodo_Inicio','Periodo_Fin','Contacto_Empresa','Obs_Empresa','Obs_Alumno'],
+      empresas: ['Nombre','CIF','Sector','Direccion','Contacto_Nombre','Contacto_Cargo','Contacto_Telefono','Contacto_Email','Observaciones']
+    };
+    const ejemplo = {
+      alumnado: [
+        ['García López','Carlos','12345678A','2024-2025','INFORMÁTICA Y COMUNICACIONES','2CFGM','Mi Empresa S.L.','B12345678','2025-03-03','2025-06-20','Ana Pérez — 976 000 000','Soporte técnico','Buen rendimiento'],
+        ['Martínez Sanz','Laura','23456789B','2024-2025','ADMINISTRACIÓN Y GESTIÓN','2CFGS','Otra Empresa S.A.','A87654321','2025-03-03','2025-06-20','Juan García — 976 111 222','',''],
+      ],
+      empresas: [['Mi Empresa S.L.','B12345678','Informática','C/ Ejemplo 1 Zaragoza','Ana Pérez','Tutora empresa','976 000 000','aperez@empresa.com','Primera colaboración']]
+    };
+    const wb = XLSX.utils.book_new();
+    const wsData = [headers[importTipo], ...ejemplo[importTipo]];
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    ws['!cols'] = headers[importTipo].map((_,i) => ({wch: i<4?14:i<6?28:i<8?12:24}));
+    // Fila de notas de validación en fila 4
+    if (isAlumnado) {
+      wsData.push(['','','','','Valores: INFORMÁTICA Y COMUNICACIONES / ADMINISTRACIÓN Y GESTIÓN / COMERCIO Y MARKETING / ELECTRICIDAD Y ELECTRÓNICA / SANIDAD / etc.','Valores: 1CFGB / 2CFGB / 1CFGM / 2CFGM / 1CFGS / 2CFGS / CE','','','AAAA-MM-DD','AAAA-MM-DD','','','']);
+    }
+    const ws2 = XLSX.utils.aoa_to_sheet(wsData);
+    ws2['!cols'] = headers[importTipo].map((_,i) => ({wch: i<4?14:i<6?32:i<8?12:24}));
+    XLSX.utils.book_append_sheet(wb, ws2, isAlumnado?'Alumnado_FEOE':'Empresas_FEOE');
+    XLSX.writeFile(wb, nombre+'.xlsx');
+  }
+}
+
+function descargarBlob(blob, nombre) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = nombre;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+
+// ══════════════════════════════════════════
+//  DATOS DESDE API — Docker
+// ══════════════════════════════════════════
+
+function setSaveIndicator(estado) {
+  const icon=document.getElementById('saveIcon'), text=document.getElementById('saveText');
+  if(!icon) return;
+  const m={'saved':['✅','Guardado'],'pending':['⏳','Guardando…'],'error':['⚠️','Error'],'none':['','']};
+  if(m[estado]){icon.textContent=m[estado][0];text.textContent=m[estado][1];}
+}
+function autoguardar() {}
+
+function toggleMenuDatos(e) {
+  e.stopPropagation();
+  const m=document.getElementById('menuDatos');
+  if(m.style.display==='none'||!m.style.display){m.style.display='block';actualizarInfoStorage();}
+  else m.style.display='none';
+}
+function cerrarMenuDatos() { const m=document.getElementById('menuDatos'); if(m) m.style.display='none'; }
+document.addEventListener('click',()=>cerrarMenuDatos());
+function actualizarInfoStorage() {
+  const el=document.getElementById('storageInfo');
+  if(!el) return;
+  const n=state.alumnado.filter(a=>!a.deleted).length;
+  const e=state.empresas.filter(x=>!x.deleted).length;
+  el.innerHTML='BD SQLite · <b>'+n+' alumnos</b> · '+e+' empresas';
+}
+
+async function restaurarBackupJSON(evt) {
+  const file = evt.target.files[0];
+  if (!file) return;
+  evt.target.value = '';
+  const reader = new FileReader();
+  reader.onload = async ev => {
+    try {
+      const d = JSON.parse(ev.target.result);
+      if (!d.alumnado || !d.empresas) throw new Error('Formato no reconocido');
+      confirmar(
+        'Restaurar copia de seguridad',
+        'El fichero contiene ' + d.alumnado.length + ' alumnos y ' + d.empresas.length + ' empresas.\n\nSe importaran los registros que no existan (por DNI/CIF). No se sobreescribiran los existentes.\n\n¿Continuar?',
+        async () => {
+          let al=0, emp=0, err=0;
+          // Import empresas first
+          for (const e of (d.empresas||[])) {
+            if (!e.nombre || !e.cif) continue;
+            try {
+              await Empresas.create({
+                nombre:e.nombre, cif:e.cif, sector:e.sector||'',
+                direccion:e.direccion||'', contacto_nombre:e.contactoNombre||'',
+                contacto_cargo:e.contactoCargo||'', contacto_tel:e.contactoTel||'',
+                contacto_email:e.contactoEmail||'', obs:e.obs||''
+              });
+              emp++;
+            } catch { err++; }
+          }
+          // Import alumnado + estancias
+          for (const a of (d.alumnado||[])) {
+            if (!a.apellidos || !a.nombre || !a.dni) continue;
+            try {
+              const {alumno} = await Alumnado.create({
+                apellidos:a.apellidos, nombre:a.nombre,
+                dni:a.dni, familia:a.familia||''
+              });
+              // Import estancias for this alumno
+              for (const est of (a.estancias||[])) {
+                if (!est.curso) continue;
+                try {
+                  await Estancias.create({
+                    alumno_id: alumno.id, curso: est.curso,
+                    nivel: est.nivel||'', empresa_nombre: est.empresaNombre||'',
+                    empresa_cif: est.empresaCif||'', periodo_ini: est.periodoIni||'',
+                    periodo_fin: est.periodoFin||'', contacto: est.contacto||'',
+                    obs_empresa: est.obsEmpresa||'', obs_alumno: est.obsAlumno||''
+                  });
+                } catch {}
+              }
+              al++;
+            } catch { err++; }
+          }
+          await cargarDatos();
+          addHistorial('new', 'Backup restaurado: '+al+' alumnos, '+emp+' empresas');
+          toast('Restauracion completada: '+al+' alumnos, '+emp+' empresas'+(err?' ('+err+' errores)':''), 'success');
+        }
+      );
+    } catch(e) { toast('Error al leer el fichero: '+e.message, 'error'); }
+  };
+  reader.readAsText(file);
+}
+
+function exportarExcel() {
+  cerrarMenuDatos();
+  const data=getEstanciasFiltradas();
+  const rows=[['ID Alumno','Apellidos','Nombre','DNI/NIE','Familia','Curso','Nivel','Empresa','CIF','Periodo Inicio','Periodo Fin','Contacto','Obs. Empresa','Obs. Alumno'],
+    ...data.map(r=>[r.alumnoId,r.apellidos,r.nombre,r.dni,r.familia||'',r.curso,r.nivel||'',r.empresaNombre,r.empresaCif,r.periodoIni,r.periodoFin,r.contacto,r.obsEmpresa,r.obsAlumno])];
+  const wb=XLSX.utils.book_new(), ws=XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols']=[6,20,14,12,28,11,8,28,12,13,13,30,35,35].map(w=>({wch:w}));
+  XLSX.utils.book_append_sheet(wb,ws,'Estancias_FEOE');
+  XLSX.writeFile(wb,'FEOE_estancias_'+new Date().toISOString().slice(0,10)+'.xlsx');
+  toast('Excel exportado: '+data.length+' estancias','success');
+}
+function exportarCSV() {
+  cerrarMenuDatos();
+  const data=getEstanciasFiltradas();
+  const cab='ID_Alumno,Apellidos,Nombre,DNI_NIE,Familia,Curso,Nivel,Empresa,CIF,Periodo_Inicio,Periodo_Fin,Contacto,Obs_Empresa,Obs_Alumno';
+  const filas=data.map(r=>[r.alumnoId,r.apellidos,r.nombre,r.dni,r.familia||'',r.curso,r.nivel||'',r.empresaNombre,r.empresaCif,r.periodoIni,r.periodoFin,r.contacto,r.obsEmpresa,r.obsAlumno]
+    .map(v=>'"'+String(v||'').replace(/"/g,'""')+'"').join(','));
+  descargarBlob(new Blob(['\uFEFF'+cab+'\n'+filas.join('\n')],{type:'text/csv;charset=utf-8'}),'FEOE_estancias_'+new Date().toISOString().slice(0,10)+'.csv');
+  toast('CSV exportado: '+data.length+' estancias','success');
+}
+function exportarEmpresasExcel() {
+  cerrarMenuDatos();
+  const q=(document.getElementById('searchEmpresa')?.value||'').toLowerCase();
+  const data=state.empresas.filter(e=>!e.deleted);
+  const filtradas=q?data.filter(e=>(e.nombre+' '+e.cif).toLowerCase().includes(q)):data;
+  const rows=[['ID','Nombre','CIF','Sector','Direccion','Contacto','Cargo','Telefono','Email','Obs','N Estancias'],
+    ...filtradas.map(e=>[e.id,e.nombre,e.cif,e.sector,e.direccion,e.contactoNombre,e.contactoCargo,e.contactoTel,e.contactoEmail,e.obs,
+      state.estancias.filter(s=>!s.deleted&&s.empresaId===e.id).length])];
+  const wb=XLSX.utils.book_new(),ws=XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols']=[4,30,12,20,35,20,20,14,30,40,8].map(w=>({wch:w}));
+  XLSX.utils.book_append_sheet(wb,ws,'Empresas_FEOE');
+  XLSX.writeFile(wb,'FEOE_empresas_'+new Date().toISOString().slice(0,10)+'.xlsx');
+  toast('Excel exportado: '+filtradas.length+' empresas','success');
+}
+function exportarJSON() {
+  cerrarMenuDatos();
+  descargarBlob(new Blob([JSON.stringify({alumnado:state.alumnado,empresas:state.empresas,_savedAt:new Date().toISOString()},null,2)],{type:'application/json'}),'FEOE_backup_'+new Date().toISOString().slice(0,10)+'.json');
+  toast('Backup exportado','success');
+}
+
+async function guardarAlumno() {
+  const apellidos=document.getElementById('aApellidos').value.trim();
+  const nombre=document.getElementById('aNombre').value.trim();
+  const dni=document.getElementById('aDni').value.trim();
+  if(!apellidos||!nombre||!dni){toast('Apellidos, nombre y DNI son obligatorios','error');return;}
+  const body={apellidos,nombre,dni,familia:document.getElementById('aFamilia').value};
+  const idEl=document.getElementById('alumnoId').value;
+  try {
+    setSaveIndicator('pending');
+    let alumnoId;
+    if(!idEl){
+      const {alumno}=await Alumnado.create(body);
+      alumnoId=alumno.id; document.getElementById('alumnoId').value=alumnoId;
+      addHistorial('new','Alta alumno: '+apellidos+' '+nombre);
+      toast('Alumno añadido. Añade su estancia FEOE abajo.','success');
+    } else {
+      alumnoId=parseInt(idEl); await Alumnado.update(alumnoId,body);
+      addHistorial('edit','Modificado: '+apellidos+' '+nombre); toast('Datos actualizados','success');
+    }
+    document.getElementById('seccionEstancias').style.display='block';
+    await cargarDatos(); renderListaEstancias(alumnoId); setSaveIndicator('saved');
+  } catch(err){setSaveIndicator('error');toast('Error: '+err.message,'error');}
+}
+
+async function guardarEstancia() {
+  const alumnoId=parseInt(document.getElementById('alumnoId').value);
+  if(!alumnoId){toast('Guarda primero los datos del alumno','error');return;}
+  const curso=document.getElementById('aCurso').value;
+  if(!curso){toast('Selecciona el curso académico','error');return;}
+  const body={alumno_id:alumnoId,curso,nivel:document.getElementById('aNivel').value,
+    empresa_id:parseInt(document.getElementById('aEmpresa').value)||null,
+    empresa_nombre:document.getElementById('aEmpresaNombre').value.trim(),
+    empresa_cif:document.getElementById('aEmpresaCif').value.trim(),
+    periodo_ini:document.getElementById('aPeriodoIni').value,
+    periodo_fin:document.getElementById('aPeriodoFin').value,
+    contacto:document.getElementById('aContacto').value.trim(),
+    obs_empresa:document.getElementById('aObsEmpresa').value.trim(),
+    obs_alumno:document.getElementById('aObsAlumno').value.trim()};
+  const estId=document.getElementById('estanciaId').value;
+  const alumno=state.alumnado.find(a=>a.id===alumnoId);
+  try {
+    setSaveIndicator('pending');
+    if(!estId){
+      await Estancias.create(body);
+      addHistorial('new','Nueva estancia: '+(alumno?.apellidos||'')+' — '+curso);
+      toast('Estancia añadida','success');
+    } else {
+      await Estancias.update(parseInt(estId),body);
+      addHistorial('edit','Estancia actualizada: '+(alumno?.apellidos||'')+' — '+curso);
+      toast('Estancia actualizada','success');
+    }
+    await cargarDatos(); renderListaEstancias(alumnoId); mostrarFormEstancia(null);
+    setSaveIndicator('saved');
+  } catch(err){setSaveIndicator('error');toast('Error: '+err.message,'error');}
+}
+
+async function guardarEmpresa() {
+  const nombre=document.getElementById('eNombre').value.trim();
+  const cif=document.getElementById('eCif').value.trim();
+  if(!nombre||!cif){toast('Nombre y CIF son obligatorios','error');return;}
+  const body={nombre,cif,
+    sector:document.getElementById('eSector').value.trim(),
+    direccion:document.getElementById('eDireccion').value.trim(),
+    contacto_nombre:document.getElementById('eContactoNombre').value.trim(),
+    contacto_cargo:document.getElementById('eContactoCargo').value.trim(),
+    contacto_tel:document.getElementById('eContactoTel').value.trim(),
+    contacto_email:document.getElementById('eContactoEmail').value.trim(),
+    obs:document.getElementById('eObs').value.trim()};
+  const idEl=document.getElementById('empresaId').value;
+  try {
+    setSaveIndicator('pending');
+    if(!idEl){
+      await Empresas.create(body); addHistorial('new','Alta empresa: '+nombre+' ('+cif+')');
+      toast('Empresa "'+nombre+'" añadida','success');
+    } else {
+      const uid=parseInt(idEl);
+      const old=state.empresas.find(e=>e.id===uid);
+      if(old&&body.direccion!==old.direccion) delete geocacheMap[old.cif];
+      await Empresas.update(uid,body); addHistorial('edit','Modificada empresa: '+nombre);
+      toast('Empresa actualizada','success');
+    }
+    cerrarPanel('overlayEmpresa'); await cargarDatos(); renderEmpresas(); actualizarContadores();
+    setSaveIndicator('saved');
+  } catch(err){setSaveIndicator('error');toast('Error: '+err.message,'error');}
+}
+
+function solicitarEliminarEstancia(estanciaId) {
+  const e=findEstancia(estanciaId);
+  const a=state.alumnado.find(x=>x.id===e?.alumnoId);
+  solicitarEliminar('estancia',estanciaId,'Estancia '+(e?.curso||'')+' — '+(a?.apellidos||'')+' '+(a?.nombre||''));
+}
+
+async function solicitarEliminar(tipo,refId,nombre) {
+  if(state.pendientes.find(p=>p.tipo===tipo&&p.refId===refId&&!p.resuelto)){toast('Ya existe solicitud pendiente','warning');return;}
+  confirmar('Solicitar eliminación','Se solicitara la eliminacion de "'+nombre+'".\n\nEl registro quedara marcado y un administrador debera confirmarlo.',async()=>{
+    try {
+      await Pendientes.create({tipo,ref_id:refId,nombre});
+      addHistorial('del','Solicitud eliminacion: '+tipo+' "'+nombre+'"');
+      toast('Solicitud enviada. Pendiente de aprobacion.','warning');
+      if(tipo==='estancia'){updateEstanciaLocal(refId,{deletePending:true});const ep=findEstancia(refId);if(ep?.alumnoId)renderListaEstancias(ep.alumnoId);}
+      await cargarDatos(); actualizarContadores();
+      if(canValidate()) switchTab('pendientes');
+    } catch(err){toast('Error: '+err.message,'error');}
+  });
+}
+
+async function resolverPendiente(pid,aprobar) {
+  try {
+    await Pendientes.resolver(pid,aprobar);
+    addHistorial('del','Eliminacion '+(aprobar?'APROBADA':'RECHAZADA')+' por admin');
+    toast(aprobar?'Eliminacion aprobada.':'Solicitud rechazada.',aprobar?'success':'warning');
+    await cargarDatos(); renderPendientes(); renderTabla(); renderEmpresas(); renderStats(); actualizarContadores();
+  } catch(err){toast('Error: '+err.message,'error');}
+}
+
+async function eliminarSeleccionados() {
+  if(seleccion.size===0) return;
+  const ids=[...seleccion];
+  const nombres=ids.map(id=>{const a=state.alumnado.find(x=>x.id===id);return a?a.apellidos+', '+a.nombre:'#'+id;});
+  const msg='Se eliminaran '+ids.length+' alumno(s) y todas sus estancias FEOE.\n\n'+nombres.slice(0,5).join('\n')+(ids.length>5?'\n...y '+(ids.length-5)+' mas':'');
+  confirmar('Eliminar '+ids.length+' alumno(s)',msg,async()=>{
+    try {
+      await Alumnado.bulkDelete(ids);
+      ids.forEach(id=>{const a=state.alumnado.find(x=>x.id===id);addHistorial('del','Eliminacion: '+(a?.apellidos||'')+' '+(a?.nombre||''));});
+      seleccion.clear(); actualizarBarraSeleccion();
+      await cargarDatos(); actualizarFiltros(); renderTabla(); renderStats(); actualizarContadores();
+      toast(ids.length+' alumno(s) eliminado(s)','success');
+    } catch(err){toast('Error: '+err.message,'error');}
+  });
+}
+
+function addHistorialAPI(tipo,texto) {
+  Historial.create(tipo,texto).catch(()=>{});
+  state.historial.unshift({id:Date.now(),tipo,texto,usuario:currentUser?.role||'profesor',fecha:new Date().toISOString()});
+}
+function addHistorial(tipo,texto){addHistorialAPI(tipo,texto);}
+
+function toggleRole() {
+  confirmar('Cerrar sesion','Cerrar la sesion actual?',async()=>{
+    await Auth.logout(); currentUser=null;
+    document.getElementById('loginUser').value=''; document.getElementById('loginPass').value='';
+    mostrarLogin();
+  });
+}
+
+async function cargarDatos() {
+  setSaveIndicator('pending');
+  try {
+    const [{alumnado},{empresas},{pendientes},{historial}]=await Promise.all([Alumnado.list(),Empresas.list(),Pendientes.list(),Historial.list()]);
+    state.alumnado=alumnado.map(a=>({id:a.id,apellidos:a.apellidos,nombre:a.nombre,dni:a.dni,familia:a.familia||'',deleted:!!a.deleted,estancias:(a.estancias||[]).map(normalizarEstancia)}));
+    state.empresas=empresas.map(e=>({id:e.id,nombre:e.nombre,cif:e.cif,sector:e.sector||'',direccion:e.direccion||'',lat:e.lat||null,lon:e.lon||null,contactoNombre:e.contacto_nombre||'',contactoCargo:e.contacto_cargo||'',contactoTel:e.contacto_tel||'',contactoEmail:e.contacto_email||'',obs:e.obs||'',deleted:!!e.deleted}));
+    state.pendientes=pendientes.map(p=>({id:p.id,tipo:p.tipo,refId:p.ref_id,nombre:p.nombre,solicitante:p.solicitante,fecha:p.created_at,resuelto:!!p.resuelto,aprobado:p.aprobado}));
+    state.historial=historial.map(h=>({id:h.id,tipo:h.tipo,texto:h.texto,usuario:h.usuario,fecha:h.created_at}));
+    state.empresas.forEach(e=>{if(e.lat&&e.lon) geocacheMap[e.cif]={lat:e.lat,lon:e.lon};});
+    if(currentUser?.role==='admin'||currentUser?.role==='tutor'){try{const{users}=await Users.list();state.usuarios=users;}catch{state.usuarios=[];}}
+    setSaveIndicator('saved'); actualizarFiltros(); renderTabla(); renderStats(); actualizarContadores();
+    poblarSelectorSupervisor();
+  } catch(err){setSaveIndicator('error');toast('Error al cargar datos: '+err.message,'error');}
+}
+
+function poblarSelectorSupervisor() {
+  const sel=document.getElementById('aSupervisor');
+  if(!sel) return;
+  const tutors=(state.usuarios||[]).filter(u=>u.activo&&(u.role==='admin'||u.role==='tutor'||u.role==='profe'));
+  const cur=sel.value;
+  sel.innerHTML='<option value="">-- Sin asignar --</option>'+tutors.map(u=>'<option value="'+u.id+'" data-nombre="'+(u.nombre||u.username)+'">'+rolLabel(u.role)+': '+(u.nombre||u.username)+'</option>').join('');
+  if(cur) sel.value=cur;
+}
+
+function normalizarEstancia(e) {
+  return {id:e.id,alumnoId:e.alumno_id,curso:e.curso||'',nivel:e.nivel||'',empresaId:e.empresa_id||null,empresaNombre:e.empresa_nombre||'',empresaCif:e.empresa_cif||'',periodoIni:e.periodo_ini||'',periodoFin:e.periodo_fin||'',contacto:e.contacto||'',obsEmpresa:e.obs_empresa||'',obsAlumno:e.obs_alumno||'',deleted:!!e.deleted,deletePending:!!e.delete_pending,calificacion:e.calificacion||'',supervisorId:e.supervisor_id||null,supervisorNombre:e.supervisor_nombre||'',numSeguimientos:e.num_seguimientos||0,numPendientesValidacion:e.num_pendientes_validacion||0};
+}
+
+async function ejecutarImport() {
+  const getCol=key=>document.getElementById('map_'+key)?.value||'';
+  let cr=0,ac=0,en=0,ea=0,om=0;
+  if(importTipo==='alumnado') {
+    for(const row of importParsed){
+      const apellidos=row[getCol('apellidos')]?.trim(),nombre=row[getCol('nombre')]?.trim(),dni=row[getCol('dni')]?.trim().toUpperCase(),curso=row[getCol('curso')]?.trim();
+      if(!apellidos||!nombre||!dni){om++;continue;}
+      try{
+        const empCif=row[getCol('empresaCif')]?.trim()||'';
+        const emp=state.empresas.find(e=>e.cif===empCif&&!e.deleted);
+        const{alumno,updated}=await Alumnado.create({apellidos,nombre,dni,familia:row[getCol('familia')]?.trim()||''});
+        if(updated)ac++;else cr++;
+        if(curso){
+          const body={alumno_id:alumno.id,curso,nivel:row[getCol('nivel')]?.trim()||'',empresa_id:emp?.id||null,empresa_nombre:row[getCol('empresaNombre')]?.trim()||'',empresa_cif:empCif,periodo_ini:row[getCol('periodoIni')]?.trim()||'',periodo_fin:row[getCol('periodoFin')]?.trim()||'',contacto:row[getCol('contacto')]?.trim()||'',obs_empresa:row[getCol('obsEmpresa')]?.trim()||'',obs_alumno:row[getCol('obsAlumno')]?.trim()||''};
+          const{updated:eu}=await Estancias.create(body);if(eu)ea++;else en++;
+        }
+      }catch{om++;}
+    }
+  } else {
+    for(const row of importParsed){
+      const nombre=row[getCol('nombre')]?.trim(),cif=row[getCol('cif')]?.trim().toUpperCase();
+      if(!nombre||!cif){om++;continue;}
+      try{const{updated}=await Empresas.create({nombre,cif,sector:row[getCol('sector')]?.trim()||'',direccion:row[getCol('direccion')]?.trim()||'',contacto_nombre:row[getCol('contactoNombre')]?.trim()||'',contacto_cargo:row[getCol('contactoCargo')]?.trim()||'',contacto_tel:row[getCol('contactoTel')]?.trim()||'',contacto_email:row[getCol('contactoEmail')]?.trim()||'',obs:row[getCol('obs')]?.trim()||''});if(updated)ac++;else cr++;}catch{om++;}
+    }
+  }
+  cerrarImport(); await cargarDatos(); actualizarFiltros(); renderTabla(); renderEmpresas(); renderStats(); actualizarContadores();
+  addHistorial('new','Importacion: '+cr+' nuevos, '+ac+' actualizados, '+om+' omitidos');
+  toast('Importacion completada: '+cr+' nuevos '+ac+' actualizados'+(om?' '+om+' omitidos':''),'success');
+}
+
+function canWrite()  { return (ROLE_LEVEL[state.currentRole]||0) >= ROLE_LEVEL.profe; }
+function canValidate() { return (ROLE_LEVEL[state.currentRole]||0) >= ROLE_LEVEL.tutor; }
+function isAdmin()   { return state.currentRole === 'admin'; }
+function rolLabel(role) {
+  const m = { admin:'Admin', tutor:'Tutor/a', profe:'Profesor/a', invitado:'Invitado' };
+  return m[role] || role;
+}
+function rolBadgeStyle(role) {
+  if (role === 'admin')    return 'background:rgba(200,168,75,0.2);color:var(--gold);border:1px solid rgba(200,168,75,0.4)';
+  if (role === 'tutor')    return 'background:#edf8f0;color:#1a7a3c;border:1px solid #a0d9b4';
+  if (role === 'profe')    return 'background:var(--az-light);color:var(--az)';
+  if (role === 'invitado') return 'background:var(--gray6);color:var(--gray3)';
+  return '';
+}
+
+// ══════════════════════════════════════════
+//  USUARIOS — panel y tabla
+// ══════════════════════════════════════════
+function renderUsuarios() {
+  const q = (document.getElementById('searchUsuarios')?.value||'').toLowerCase();
+  const tbody = document.getElementById('usuariosBody');
+  const empty = document.getElementById('usuariosEmpty');
+  if (!tbody) return;
+  let users = (state.usuarios||[]);
+  if (q) users = users.filter(u => (u.username+' '+(u.nombre||'')+' '+u.role).toLowerCase().includes(q));
+  if (!users.length) { tbody.innerHTML=''; empty.style.display='block'; return; }
+  empty.style.display = 'none';
+  tbody.innerHTML = users.map(u => {
+    const isMe = u.id === currentUser?.id;
+    const rb = '<span class="badge" style="'+rolBadgeStyle(u.role)+'">'+rolLabel(u.role)+'</span>';
+    const sb = u.activo ? '<span class="badge badge-ok">Activo</span>' : '<span class="badge badge-del">Inactivo</span>';
+    const canDel = isAdmin() && !isMe && u.role !== 'admin';
+    return '<tr>'
+      +'<td class="mono" style="color:var(--gray4)">'+String(u.id).padStart(2,'0')+'</td>'
+      +'<td><div style="font-weight:600;font-family:monospace">'+u.username+'</div>'+(isMe?'<div style="font-size:10px;color:var(--gold)">Tu cuenta</div>':'')+'</td>'
+      +'<td>'+(u.nombre||'<span style="color:var(--gray4)">—</span>')+'</td>'
+      +'<td class="hide-mobile">'+rb+'</td>'
+      +'<td class="hide-mobile">'+sb+'</td>'
+      +'<td class="hide-mobile" style="font-size:12px;color:var(--gray3)">'+(u.created_at?new Date(u.created_at).toLocaleDateString('es-ES'):'—')+'</td>'
+      +'<td><div style="display:flex;gap:4px">'
+      +(isAdmin()?'<button class="btn btn-sm btn-secondary" onclick="abrirPanelUsuario('+u.id+')">Editar</button>':'')
+      +(canDel?'<button class="btn btn-sm btn-danger" onclick="borrarUsuario('+u.id+',\''+u.username+'\')">Borrar</button>':'')
+      +'</div></td></tr>';
+  }).join('');
+}
+
+function abrirPanelUsuario(id) {
+  const isNew = id === null;
+  document.getElementById('panelUsuarioTitle').textContent = isNew ? 'Nuevo usuario' : 'Editar usuario';
+  document.getElementById('panelUsuarioSub').textContent   = isNew ? 'Crea una cuenta de acceso' : 'Editando usuario #'+id;
+  document.getElementById('usuarioId').value = id||'';
+  document.getElementById('seccionPasswordNuevo').style.display  = isNew ? 'block' : 'none';
+  document.getElementById('seccionPasswordEditar').style.display = isNew ? 'none'  : 'block';
+  document.getElementById('seccionEstadoUsuario').style.display  = isNew ? 'none'  : 'block';
+  const unEl = document.getElementById('uUsername');
+  // Update role options to include all 4 roles
+  const rolSel = document.getElementById('uRole');
+  if (rolSel) rolSel.innerHTML = '<option value="admin">Admin</option><option value="tutor">Tutor/a</option><option value="profe">Profesor/a</option><option value="invitado">Invitado</option>';
+  if (isNew) {
+    ['uUsername','uNombre','uPassword','uPassword2'].forEach(f=>document.getElementById(f).value='');
+    unEl.readOnly = false; if (rolSel) rolSel.value = 'profe';
+  } else {
+    const u = (state.usuarios||[]).find(x=>x.id===id);
+    if (!u) return;
+    unEl.value=u.username; unEl.readOnly=true;
+    document.getElementById('uNombre').value=u.nombre||'';
+    if (rolSel) rolSel.value=u.role;
+    document.getElementById('uActivo').checked=!!u.activo;
+    ['uPasswordEdit','uPasswordEdit2'].forEach(f=>document.getElementById(f).value='');
+  }
+  document.getElementById('overlayUsuario')?.classList.add('open');
+}
+
+async function guardarUsuario() {
+  const id=document.getElementById('usuarioId').value;
+  const username=document.getElementById('uUsername').value.trim();
+  const nombre=document.getElementById('uNombre').value.trim();
+  const role=document.getElementById('uRole').value;
+  if (!username) { toast('El nombre de usuario es obligatorio','error'); return; }
+  try {
+    setSaveIndicator('pending');
+    if (!id) {
+      const pass=document.getElementById('uPassword').value, pass2=document.getElementById('uPassword2').value;
+      if (!pass||pass.length<6) { toast('Contrasena minimo 6 caracteres','error'); return; }
+      if (pass!==pass2) { toast('Las contrasenas no coinciden','error'); return; }
+      await Users.create({username,nombre:nombre||null,password:pass,role});
+      addHistorial('new','Alta usuario: '+username+' ('+role+')');
+      toast('Usuario "'+username+'" creado','success');
+    } else {
+      const uid=parseInt(id);
+      await Users.update(uid,{nombre:nombre||null,activo:document.getElementById('uActivo').checked,role});
+      const np=document.getElementById('uPasswordEdit').value;
+      if (np) {
+        if (np.length<6){toast('Contrasena minimo 6 caracteres','error');return;}
+        if (np!==document.getElementById('uPasswordEdit2').value){toast('Las contrasenas no coinciden','error');return;}
+        await Users.changePassword(uid,{newPassword:np});
+      }
+      addHistorial('edit','Modificado usuario: '+username+' ('+role+')');
+      toast('Usuario actualizado','success');
+    }
+    const {users}=await Users.list(); state.usuarios=users;
+    cerrarPanel('overlayUsuario'); renderUsuarios(); actualizarContadores();
+    setSaveIndicator('saved');
+  } catch(err){setSaveIndicator('error');toast('Error: '+err.message,'error');}
+}
+
+async function borrarUsuario(id,username) {
+  confirmar('Eliminar usuario','Eliminar la cuenta de "'+username+'"?\n\nSus datos no se eliminaran.',async()=>{
+    try {
+      await Users.delete(id); addHistorial('del','Eliminado usuario: '+username);
+      const {users}=await Users.list(); state.usuarios=users;
+      renderUsuarios(); actualizarContadores();
+      toast('Usuario "'+username+'" eliminado','success');
+    } catch(err){toast('Error: '+err.message,'error');}
+  });
+}
+
+// ══════════════════════════════════════════
+//  SEGUIMIENTOS — visitas por estancia
+// ══════════════════════════════════════════
+let _currentEstanciaId = null;
+let _seguimientosCache = [];
+
+async function cargarSeguimientos(estanciaId) {
+  _currentEstanciaId = estanciaId;
+  try {
+    const { seguimientos } = await Seguimientos.list({ estancia_id: estanciaId });
+    _seguimientosCache = seguimientos;
+    renderSeguimientosList(seguimientos);
+    const cont = document.getElementById('seguimientosContainer');
+    if (cont) cont.style.display = 'block';
+    const btnNuevo = document.getElementById('btnNuevaSeguimiento');
+    if (btnNuevo) btnNuevo.style.display = canWrite() ? 'inline-flex' : 'none';
+  } catch(err) { toast('Error al cargar seguimientos: '+err.message,'error'); }
+}
+
+function renderSeguimientosList(segs) {
+  const el = document.getElementById('seguimientosList');
+  if (!el) return;
+  if (!segs || segs.length === 0) {
+    el.innerHTML = '<div style="font-size:13px;color:var(--gray3);font-style:italic;padding:8px 0">Sin visitas registradas aun. Minimo 2 visitas recomendadas por curso.</div>';
+    return;
+  }
+  const minVisitas = 2;
+  const badge = segs.length >= minVisitas
+    ? '<span class="badge badge-ok">'+segs.length+' visitas</span>'
+    : '<span class="badge badge-pend">'+segs.length+'/'+minVisitas+' visitas</span>';
+
+  el.innerHTML = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:12px;color:var(--gray3)">'+badge+'<span>'+
+    (segs.length < minVisitas ? 'Recomendadas al menos '+minVisitas+' visitas por curso' : 'Seguimiento completado')+'</span></div>' +
+    segs.map(s => {
+      const isPending = !!s.pendiente;
+      const modalIcon = {presencial:'🏢',telefonica:'📞',telematica:'💻'}[s.modalidad]||'📋';
+      return '<div style="background:white;border:1px solid var(--gray5);border-radius:8px;padding:12px 14px;margin-bottom:8px;border-left:3px solid '+(isPending?'var(--gold)':'var(--green)') + '">'
+        +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">'
+        +'<div style="flex:1">'
+        +'<div style="font-size:12px;font-weight:700;color:var(--az);margin-bottom:4px">'
+        + modalIcon+' Visita '+s.num_visita
+        + (s.fecha_visita?' · <span style="color:var(--gray3)">'+new Date(s.fecha_visita+'T00:00').toLocaleDateString('es-ES')+'</span>':'')
+        + (isPending?' <span class="badge badge-pend" style="font-size:10px">Pendiente validacion</span>':'')
+        +'</div>'
+        +'<div style="font-size:13px;color:var(--gray1);white-space:pre-wrap">'+escHtml(s.anotaciones||'Sin anotaciones')+'</div>'
+        +'<div style="font-size:11px;color:var(--gray4);margin-top:4px">Por '+escHtml(s.autor_nombre||'—')+' · '+new Date(s.created_at).toLocaleDateString('es-ES')+'</div>'
+        +'</div>'
+        +'<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">'
+        +(canWrite()?'<button class="btn btn-sm btn-ghost" onclick="abrirFormSeguimiento('+s.id+')" style="padding:3px 8px;font-size:11px">Editar</button>':'')
+        +(canValidate()&&isPending?'<button class="btn btn-sm" onclick="validarSeguimiento('+s.id+')" style="padding:3px 8px;font-size:11px;background:var(--green);color:white">Validar</button>':'')
+        +(canValidate()?'<button class="btn btn-sm btn-ghost" onclick="borrarSeguimiento('+s.id+')" style="padding:3px 8px;font-size:11px;color:var(--red)">Borrar</button>':'')
+        +'</div></div></div>';
+    }).join('');
+}
+
+function abrirFormSeguimiento(id) {
+  const form = document.getElementById('formSeguimiento');
+  const title = document.getElementById('formSeguimientoTitle');
+  if (!form) return;
+  if (id) {
+    const s = _seguimientosCache.find(x=>x.id===id);
+    if (!s) return;
+    document.getElementById('seguimientoId').value = id;
+    document.getElementById('seFecha').value = s.fecha_visita||'';
+    document.getElementById('seModalidad').value = s.modalidad||'presencial';
+    document.getElementById('seAnotaciones').value = s.anotaciones||'';
+    if (title) title.textContent = 'Editar visita '+s.num_visita;
+  } else {
+    document.getElementById('seguimientoId').value = '';
+    document.getElementById('seFecha').value = new Date().toISOString().slice(0,10);
+    document.getElementById('seModalidad').value = 'presencial';
+    document.getElementById('seAnotaciones').value = '';
+    const nextNum = (_seguimientosCache.filter(s=>!s.deleted).length||0)+1;
+    if (title) title.textContent = 'Nueva visita (n.° '+nextNum+')';
+  }
+  form.style.display = 'block';
+  document.getElementById('seAnotaciones').focus();
+}
+
+function cerrarFormSeguimiento() {
+  const form = document.getElementById('formSeguimiento');
+  if (form) form.style.display = 'none';
+}
+
+async function guardarSeguimiento() {
+  if (!_currentEstanciaId) { toast('No hay estancia activa','error'); return; }
+  const alumnoId = parseInt(document.getElementById('alumnoId').value);
+  const id = document.getElementById('seguimientoId').value;
+  const body = {
+    estancia_id:  _currentEstanciaId,
+    alumno_id:    alumnoId,
+    fecha_visita: document.getElementById('seFecha').value,
+    modalidad:    document.getElementById('seModalidad').value,
+    anotaciones:  document.getElementById('seAnotaciones').value.trim(),
+  };
+  if (!body.anotaciones) { toast('Escribe las anotaciones de la visita','error'); return; }
+  try {
+    if (!id) {
+      await Seguimientos.create(body);
+      addHistorial('new','Nueva visita de seguimiento (estancia #'+_currentEstanciaId+')');
+      toast('Visita registrada'+(state.currentRole==='profe'?' (pendiente de validacion)':''),'success');
+    } else {
+      await Seguimientos.update(parseInt(id), body);
+      addHistorial('edit','Seguimiento editado (estancia #'+_currentEstanciaId+')');
+      toast('Visita actualizada','success');
+    }
+    cerrarFormSeguimiento();
+    await cargarSeguimientos(_currentEstanciaId);
+  } catch(err){toast('Error: '+err.message,'error');}
+}
+
+async function validarSeguimiento(id) {
+  try {
+    await Seguimientos.validar(id);
+    addHistorial('edit','Seguimiento #'+id+' validado');
+    toast('Visita validada','success');
+    await cargarSeguimientos(_currentEstanciaId);
+  } catch(err){toast('Error: '+err.message,'error');}
+}
+
+async function borrarSeguimiento(id) {
+  confirmar('Borrar visita','Borrar esta visita de seguimiento?',async()=>{
+    try {
+      await Seguimientos.delete(id);
+      addHistorial('del','Seguimiento #'+id+' borrado');
+      toast('Visita borrada','success');
+      await cargarSeguimientos(_currentEstanciaId);
+    } catch(err){toast('Error: '+err.message,'error');}
+  });
+}
+
+function escHtml(s) { const d=document.createElement('div');d.textContent=s||'';return d.innerHTML; }
+
+// ══════════════════════════════════════════
+//  VISTA VISITAS
+// ══════════════════════════════════════════
+let _visitasData = [];
+
+async function cargarVisitas() {
+  const curso = document.getElementById('filterVisitasCurso')?.value||'';
+  try {
+    const params = {};
+    if (curso) params.curso = curso;
+    const { visitas } = await Seguimientos.visitas(params);
+    _visitasData = visitas;
+    // Populate curso filter
+    const cursos = [...new Set(visitas.map(v=>v.curso))].sort().reverse();
+    const sel = document.getElementById('filterVisitasCurso');
+    const cur = sel?.value||'';
+    if (sel) sel.innerHTML = '<option value="">Todos los cursos</option>'+cursos.map(c=>'<option '+(c===cur?'selected':'')+'>'+c+'</option>').join('');
+    renderVisitas();
+    // update count
+    const cntEl = document.getElementById('cnt-visitas');
+    if (cntEl) cntEl.textContent = visitas.reduce((acc,v)=>acc+(parseInt(v.num_visitas)||0),0);
+  } catch(err){toast('Error al cargar visitas: '+err.message,'error');}
+}
+
+function renderVisitas() {
+  const el = document.getElementById('visitasContent');
+  if (!el) return;
+  const q = (document.getElementById('searchVisitas')?.value||'').toLowerCase();
+  const fPend = document.getElementById('filterVisitasPendientes')?.value||'';
+  const fCurso = document.getElementById('filterVisitasCurso')?.value||'';
+
+  let data = _visitasData;
+  if (q)     data = data.filter(v=>(v.apellidos+' '+v.alumno_nombre+' '+v.empresa_nombre).toLowerCase().includes(q));
+  if (fCurso) data = data.filter(v=>v.curso===fCurso);
+
+  if (!data.length) {
+    el.innerHTML = '<div class="empty-state"><p>No hay datos de visitas para los filtros seleccionados.</p></div>';
+    return;
+  }
+
+  // Parse visitas_data (encoded as "num|fecha|anotaciones|modalidad|autor|pendiente")
+  const parseVisitas = (str) => {
+    if (!str) return [];
+    return str.split(';;').map(v => {
+      const [num,fecha,anot,modal,autor,pend] = v.split('|');
+      return {num:parseInt(num)||1,fecha,anotaciones:anot,modalidad:modal,autor,pendiente:pend==='1'};
+    }).sort((a,b)=>a.num-b.num);
+  };
+
+  const MIN_VISITAS = 2;
+
+  el.innerHTML = data.map(row => {
+    const visitas = parseVisitas(row.visitas_data);
+    const numV = parseInt(row.num_visitas)||0;
+    const hasPending = visitas.some(v=>v.pendiente);
+    const semaforo = numV === 0
+      ? '<span style="color:var(--red);font-weight:700">⚠ 0 visitas</span>'
+      : numV < MIN_VISITAS
+      ? '<span style="color:#8B6000;font-weight:700">⏳ '+numV+'/'+MIN_VISITAS+'</span>'
+      : '<span style="color:var(--green);font-weight:700">✓ '+numV+' visitas</span>';
+
+    if (fPend==='pendiente' && !hasPending) return '';
+    if (fPend==='ok' && hasPending) return '';
+
+    const modalIcon = {presencial:'🏢',telefonica:'📞',telematica:'💻'};
+
+    return '<div style="background:white;border:1px solid var(--gray5);border-radius:10px;margin-bottom:12px;overflow:hidden;box-shadow:var(--shadow)">'
+      // Header
+      +'<div style="background:var(--az);padding:12px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px">'
+      +'<div>'
+      +'<div style="font-family:\'Crimson Pro\',serif;font-size:16px;font-weight:600;color:white">'+escHtml(row.apellidos+', '+row.alumno_nombre)+'</div>'
+      +'<div style="font-size:12px;color:rgba(255,255,255,0.65)">'+escHtml(row.empresa_nombre||'Sin empresa')+' · '+escHtml(row.curso)+' · '+(row.nivel||'—')+'</div>'
+      +'</div>'
+      +'<div style="display:flex;align-items:center;gap:10px;flex-shrink:0">'
+      +semaforo
+      +(row.calificacion?'<span class="badge" style="background:var(--gold);color:var(--az)">'+escHtml(row.calificacion)+'</span>':'')
+      +(row.supervisor_nombre?'<span style="font-size:11px;color:rgba(255,255,255,0.7)">Supervisor: '+escHtml(row.supervisor_nombre)+'</span>':'')
+      +(hasPending?'<span class="badge badge-pend" style="font-size:10px">'+visitas.filter(v=>v.pendiente).length+' pend.</span>':'')
+      +'</div>'
+      +'</div>'
+      // Visitas
+      +'<div style="padding:12px 18px">'
+      +(numV === 0
+        ? '<div style="font-size:13px;color:var(--gray3);font-style:italic;padding:8px 0">Sin visitas registradas.</div>'
+        : visitas.map(v => {
+            const icon = modalIcon[v.modalidad]||'📋';
+            return '<div style="display:flex;gap:12px;padding:8px 0;border-bottom:1px solid var(--gray6)">'
+              +'<div style="flex-shrink:0;font-size:20px;padding-top:2px">'+icon+'</div>'
+              +'<div style="flex:1">'
+              +'<div style="font-size:12px;font-weight:700;color:var(--az)">Visita '+v.num+(v.fecha?' · '+new Date(v.fecha+'T00:00').toLocaleDateString('es-ES'):'')
+              +(v.pendiente?' <span class="badge badge-pend" style="font-size:10px">Pendiente</span>':'')+'</div>'
+              +'<div style="font-size:13px;color:var(--gray1);margin-top:2px;white-space:pre-wrap">'+escHtml(v.anotaciones||'Sin anotaciones')+'</div>'
+              +(v.autor?'<div style="font-size:11px;color:var(--gray4);margin-top:2px">'+escHtml(v.autor)+'</div>':'')
+              +'</div>'
+              +(canValidate()&&v.pendiente?'':'') // buttons via JS would need more data
+              +'</div>';
+          }).join('')
+      )
+      +'<div style="display:flex;justify-content:flex-end;margin-top:8px">'
+      +'<button class="btn btn-sm btn-secondary" onclick="abrirPanelAlumnoDesdeVisitas('+row.alumno_id+','+row.estancia_id+')">Ver ficha completa</button>'
+      +'</div>'
+      +'</div>'
+      +'</div>';
+  }).filter(Boolean).join('');
+}
+
+function abrirPanelAlumnoDesdeVisitas(alumnoId, estanciaId) {
+  switchTab('alumnado');
+  setTimeout(() => {
+    abrirPanelAlumno(alumnoId);
+    setTimeout(() => mostrarFormEstancia(estanciaId), 400);
+  }, 200);
+}
+
+function mostrarLogin(errorMsg) {
+  errorMsg=errorMsg||'';
+  const overlay=document.getElementById('loginOverlay');if(!overlay)return;
+  overlay.style.display='flex';
+  const errEl=document.getElementById('loginError');
+  if(errEl){errEl.textContent=errorMsg;errEl.style.display=errorMsg?'block':'none';}
+  const btn=document.getElementById('loginBtn');if(btn)btn.disabled=false;
+  setTimeout(()=>document.getElementById('loginUser')?.focus(),100);
+}
+function ocultarLogin(){const o=document.getElementById('loginOverlay');if(o)o.style.display='none';}
+async function doLogin(){
+  const username=document.getElementById('loginUser')?.value.trim(),password=document.getElementById('loginPass')?.value;
+  if(!username||!password){mostrarLogin('Introduce usuario y contrasena.');return;}
+  const btn=document.getElementById('loginBtn');
+  if(btn){btn.disabled=true;btn.textContent='Iniciando sesion...';}
+  try{const{user}=await Auth.login(username,password);currentUser=user;ocultarLogin();await arrancarApp();}
+  catch(err){if(btn){btn.disabled=false;btn.textContent='Iniciar sesion';}mostrarLogin(err.message||'Usuario o contrasena incorrectos.');}
+}
+
+async function arrancarApp(){
+  const badge=document.getElementById('roleDisplay');
+  if(badge){badge.textContent=(currentUser.role==='admin'?'Admin: ':'Docente: ')+(currentUser.nombre||currentUser.username);badge.className='role-badge'+(currentUser.role==='admin'?' admin':'');}
+  const btnRol=document.querySelector('button[onclick="toggleRole()"]');
+  if(btnRol)btnRol.textContent='Cerrar sesion';
+  const tabU=document.getElementById('tab-usuarios');
+  if(tabU)tabU.style.display=(currentUser.role==='admin'||currentUser.role==='tutor')?'flex':'none';
+  await cargarDatos();
+  poblarSelectorSupervisor();
+}
+
+(async()=>{
+  // Show login only if session check fails
+  try {
+    const{user}=await Auth.me();
+    currentUser=user;
+    await arrancarApp();
+  } catch {
+    mostrarLogin();
+  }
+})();
+
+// ══════════════════════════════════════════
+//  MAPA (Leaflet + Nominatim)
+// ══════════════════════════════════════════
+let mapaInstance = null;
+let mapaMarkers = [];
+let mapaIniciado = false;
+let geocacheMap = {}; // cif → {lat, lon}
+let geocodificando = false;
+
+function iniciarMapa() {
+  // Poblar filtro curso del mapa
+  const cursos = [...new Set(state.estancias.filter(e=>!e.deleted).map(e=>e.curso))].sort().reverse();
+  const sel = document.getElementById('filterMapaCurso');
+  const cv = sel?.value || '';
+  if (sel) sel.innerHTML = '<option value="">Todos los cursos</option>' + cursos.map(c=>`<option ${c===cv?'selected':''}>${c}</option>`).join('');
+
+  if (!mapaIniciado) {
+    document.getElementById('mapaLoaderMsg').textContent = 'Inicializando mapa…';
+    // Centrado en Aragón
+    mapaInstance = L.map('mapaContainer', { zoomControl: true }).setView([41.65, -0.87], 9);
+    // CartoDB Positron — no requiere Referer, funciona desde file://
+    const cartoLight = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/">CARTO</a>',
+      subdomains: 'abcd', maxZoom: 20, referrerPolicy: 'no-referrer'
+    });
+    const cartoColor = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/">CARTO</a>',
+      subdomains: 'abcd', maxZoom: 20, referrerPolicy: 'no-referrer'
+    });
+    cartoColor.addTo(mapaInstance);
+    L.control.layers({ 'Mapa color': cartoColor, 'Mapa claro': cartoLight }, {}, { position: 'topright' }).addTo(mapaInstance);
+    mapaIniciado = true;
+  }
+
+  geocodificarTodas();
+}
+
+async function geocodificarTodas(forzar = false) {
+  if (geocodificando) return;
+  geocodificando = true;
+
+  const loader = document.getElementById('mapaLoader');
+  const loaderMsg = document.getElementById('mapaLoaderMsg');
+  const sinDivEl = document.getElementById('sinDireccion');
+  const sinMsg = document.getElementById('sinDireccionMsg');
+
+  loader.style.display = 'flex';
+  sinDivEl.style.display = 'none';
+
+  const conDir = state.empresas.filter(e => !e.deleted && e.direccion && e.direccion.trim());
+  const sinDir = state.empresas.filter(e => !e.deleted && (!e.direccion || !e.direccion.trim()));
+
+  // Primero: cargar coords ya guardadas en los objetos empresa → caché (salvo si forzamos)
+  if (!forzar) {
+    state.empresas.forEach(e => {
+      if (e.lat && e.lon && !geocacheMap[e.cif]) {
+        geocacheMap[e.cif] = { lat: e.lat, lon: e.lon };
+      }
+    });
+  } else {
+    // Forzar: limpiar caché y coords de todas
+    geocacheMap = {};
+    state.empresas.forEach(e => { delete e.lat; delete e.lon; });
+  }
+
+  // Empresas que necesitan geocodificarse (no están en caché)
+  const pendientes = conDir.filter(e => !geocacheMap[e.cif]);
+  let ok = 0, fail = 0;
+
+  if (pendientes.length === 0) {
+    // Todas en caché → aplicar directamente
+    aplicarCoordsDesdeCache();
+    geocodificando = false;
+    loader.style.display = 'none';
+    mostrarAviso(sinDir);
+    renderMapaMarkers();
+    return;
+  }
+
+  for (let i = 0; i < pendientes.length; i++) {
+    const emp = pendientes[i];
+    loaderMsg.textContent = `Geolocalizando "${emp.nombre}"… (${i + 1}/${pendientes.length})`;
+    try {
+      const coords = await geocodificarDireccion(emp.direccion.trim());
+      if (coords) {
+        geocacheMap[emp.cif] = coords;
+        emp.lat = coords.lat;
+        emp.lon = coords.lon;
+        ok++;
+      } else {
+        fail++;
+        console.warn(`Sin resultados para: ${emp.nombre} → "${emp.direccion}"`);
+      }
+    } catch (err) {
+      fail++;
+      console.warn(`Error geocodificando ${emp.nombre}:`, err.message);
+    }
+    // Rate limit Nominatim: 1 req/s
+    if (i < pendientes.length - 1) await new Promise(r => setTimeout(r, 1100));
+  }
+
+  aplicarCoordsDesdeCache();
+
+  // Persistir coords en BD
+  state.empresas.filter(e=>e.lat&&e.lon).forEach(e=>{ Empresas.update(e.id,{lat:e.lat,lon:e.lon}).catch(()=>{}); });
+
+  geocodificando = false;
+  loader.style.display = 'none';
+
+  // Avisos
+  const sinCoords = conDir.filter(e => !e.lat || !e.lon);
+  const problemas = [...sinDir, ...sinCoords];
+  mostrarAviso(problemas, sinCoords.length);
+  if (ok > 0 && fail === 0) toast(`${ok} empresa(s) geolocalizadas correctamente`, 'success');
+  if (fail > 0) toast(`${fail} empresa(s) no se pudieron geolocalizar. Revisa la dirección.`, 'warning');
+
+  renderMapaMarkers();
+}
+
+// Geocodifica una dirección usando la API estructurada de Nominatim.
+// Parsea el formato habitual español: "Calle X, N, CP, Ciudad"
+// Intenta primero con parámetros estructurados (más preciso), luego con query libre.
+async function geocodificarDireccion(dir) {
+  const fetchN = async (params) => {
+    const url = 'https://nominatim.openstreetmap.org/search?' +
+      new URLSearchParams({ ...params, format: 'json', limit: '3', countrycodes: 'es', addressdetails: '1' });
+    const res = await fetch(url, { referrerPolicy: 'no-referrer', headers: { 'Accept-Language': 'es' } });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  };
+
+  // Normalizar abreviaturas españolas comunes
+  const norm = s => s
+    .replace(/\bC\/\s*/gi,       'Calle ')
+    .replace(/\bC\.\s*/gi,       'Calle ')
+    .replace(/\bAv(da)?\.?\s*/gi,'Avenida ')
+    .replace(/\bPza?\.?\s*/gi,   'Plaza ')
+    .replace(/\bPg?\.?\s*/gi,    'Pasaje ')
+    .replace(/\bPol\.?\s*/gi,    'Polígono ')
+    .replace(/\bUrb\.?\s*/gi,    'Urbanización ')
+    .replace(/\bCtra?\.?\s*/gi,  'Carretera ')
+    .replace(/—/g, ',')
+    .trim();
+
+  const dirN   = norm(dir);
+  const cpM    = dirN.match(/\b(\d{5})\b/);
+  const cp     = cpM ? cpM[1] : '';
+  const partes = dirN.split(/,\s*/).map(s => s.trim()).filter(Boolean);
+  const ciudad = partes.filter(p => !/^\d{5}$/.test(p)).pop() || '';
+  const calle  = partes.filter(p => !/^\d{5}$/.test(p) && p !== ciudad)[0] || dirN;
+
+  // Intento 1: API estructurada completa
+  if (calle && (cp || ciudad)) {
+    const p = { street: calle };
+    if (cp)     p.postalcode = cp;
+    if (ciudad) p.city = ciudad;
+    const d = await fetchN(p);
+    if (d && d.length > 0) {
+      const best = d.find(x => x.address?.country_code === 'es') || d[0];
+      return { lat: parseFloat(best.lat), lon: parseFloat(best.lon) };
+    }
+  }
+
+  // Intento 2: solo CP + ciudad
+  if (cp && ciudad) {
+    const d = await fetchN({ postalcode: cp, city: ciudad });
+    if (d && d.length > 0) return { lat: parseFloat(d[0].lat), lon: parseFloat(d[0].lon) };
+  }
+
+  // Intento 3: solo CP
+  if (cp) {
+    const d = await fetchN({ postalcode: cp, country: 'España' });
+    if (d && d.length > 0) return { lat: parseFloat(d[0].lat), lon: parseFloat(d[0].lon) };
+  }
+
+  // Intento 4: query libre como último recurso
+  const qEnc = encodeURIComponent(dirN + ', España');
+  const r = await fetch(`https://nominatim.openstreetmap.org/search?q=${qEnc}&format=json&limit=1&countrycodes=es`,
+    { referrerPolicy: 'no-referrer', headers: { 'Accept-Language': 'es' } });
+  const dl = await r.json();
+  if (dl && dl.length > 0) return { lat: parseFloat(dl[0].lat), lon: parseFloat(dl[0].lon) };
+
+  return null;
+}
+
+function aplicarCoordsDesdeCache() {
+  state.empresas.forEach(e => {
+    if (!e.lat && geocacheMap[e.cif]) {
+      e.lat = geocacheMap[e.cif].lat;
+      e.lon = geocacheMap[e.cif].lon;
+    }
+  });
+}
+
+function mostrarAviso(sinDir, sinCoords = 0) {
+  const sinDivEl = document.getElementById('sinDireccion');
+  const sinMsg = document.getElementById('sinDireccionMsg');
+  const partes = [];
+  if (sinDir.length) partes.push(`${sinDir.length} sin dirección`);
+  if (sinCoords > 0) partes.push(`${sinCoords} con dirección no reconocida`);
+  if (partes.length) {
+    sinMsg.textContent = partes.join(' · ') + '. Edítalas para que aparezcan en el mapa.';
+    sinDivEl.style.display = 'block';
+  } else {
+    sinDivEl.style.display = 'none';
+  }
+}
+
+function renderMapaMarkers() {
+  if (!mapaInstance) return;
+
+  mapaMarkers.forEach(m => m.remove());
+  mapaMarkers = [];
+
+  const q = (document.getElementById('searchMapa')?.value || '').toLowerCase();
+  const fCurso = document.getElementById('filterMapaCurso')?.value || '';
+  const cursoActual = '2024-2025';
+  const cursoRef = fCurso || cursoActual;
+
+  const bounds = [];
+  const todasEmpresas = state.empresas.filter(e => !e.deleted);
+
+  // ── Panel de estado ──
+  const listaEl = document.getElementById('mapaEstadoLista');
+  if (listaEl) {
+    listaEl.innerHTML = todasEmpresas.map(emp => {
+      const tieneDir = emp.direccion && emp.direccion.trim();
+      const tieneCoords = emp.lat && emp.lon;
+      const nAct = state.estancias.filter(e => !e.deleted && e.empresaId === emp.id && e.curso === cursoRef).length;
+      let estadoIcon, estadoTxt, estadoColor;
+      if (tieneCoords) {
+        estadoIcon = '📍'; estadoTxt = 'En el mapa'; estadoColor = 'var(--green)';
+      } else if (tieneDir) {
+        estadoIcon = '⏳'; estadoTxt = 'Pendiente geocodificar'; estadoColor = '#8B6000';
+      } else {
+        estadoIcon = '⚠️'; estadoTxt = 'Sin dirección'; estadoColor = 'var(--red)';
+      }
+      return `
+        <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border:var(--border);border-radius:4px;background:var(--gray7)">
+          <span style="font-size:16px">${estadoIcon}</span>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${emp.nombre}</div>
+            <div style="font-size:11px;color:${estadoColor}">${estadoTxt}${tieneDir ? '' : ' — añade dirección en la ficha'}</div>
+            ${tieneDir ? `<div style="font-size:10px;color:var(--gray4);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${emp.direccion}</div>` : ''}
+          </div>
+          <span style="font-size:11px;font-weight:700;color:var(--az);font-family:var(--mono);flex-shrink:0">${nAct > 0 ? nAct+'👤' : ''}</span>
+          <button class="btn btn-sm btn-ghost" style="flex-shrink:0;padding:3px 7px;font-size:11px" onclick="abrirPanelEmpresa(${emp.id})" title="Editar empresa">✏️</button>
+        </div>`;
+    }).join('');
+  }
+
+  // ── Marcadores ──
+  todasEmpresas.filter(emp => emp.lat && emp.lon).forEach(emp => {
+    if (q && !`${emp.nombre} ${emp.cif} ${emp.sector} ${emp.contactoNombre}`.toLowerCase().includes(q)) return;
+
+    // estancias → join with alumnado for display
+    const estAct  = state.estancias.filter(e=>!e.deleted && e.empresaId===emp.id && e.curso===cursoRef);
+    const estHist = state.estancias.filter(e=>!e.deleted && e.empresaId===emp.id && e.curso!==cursoRef);
+    const alumnosActuales  = estAct.map(e=>{const a=state.alumnado.find(x=>x.id===e.alumnoId)||{}; return {...e,apellidos:a.apellidos||'?',nombre:a.nombre||''};});
+    const alumnosHistorico = estHist.map(e=>{const a=state.alumnado.find(x=>x.id===e.alumnoId)||{}; return {...e,apellidos:a.apellidos||'?',nombre:a.nombre||''};});
+    const tieneActuales = alumnosActuales.length > 0;
+    const color = tieneActuales ? '#003DA5' : '#6B6F80';
+    const total = alumnosActuales.length;
+
+    const svgIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="34" height="42" viewBox="0 0 34 42">
+      <path d="M17 0C7.6 0 0 7.6 0 17c0 13 17 25 17 25S34 30 34 17C34 7.6 26.4 0 17 0z" fill="${color}" stroke="white" stroke-width="2"/>
+      <circle cx="17" cy="17" r="10" fill="white" opacity="0.25"/>
+      <text x="17" y="22" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="${total > 9 ? '10' : '12'}" font-weight="700" fill="white">${total > 0 ? total : '·'}</text>
+    </svg>`;
+
+    const icon = L.divIcon({ html: svgIcon, iconSize: [34,42], iconAnchor: [17,42], popupAnchor: [0,-44], className: '' });
+    const marker = L.marker([emp.lat, emp.lon], { icon }).addTo(mapaInstance);
+    const popupHTML = buildPopupHTML(emp, alumnosActuales, alumnosHistorico, cursoRef);
+    marker.bindPopup(popupHTML, { maxWidth: 340, minWidth: 280 });
+    marker.on('popupopen', () => {
+      const btn = document.querySelector('.emp-popup-btn');
+      if (btn) btn.onclick = () => { marker.closePopup(); switchTab('empresas'); setTimeout(()=>{ const el = document.getElementById(`empcard-${emp.id}`); if(el){ el.style.display='block'; el.scrollIntoView({behavior:'smooth'}); } }, 300); };
+    });
+
+    mapaMarkers.push(marker);
+    bounds.push([emp.lat, emp.lon]);
+  });
+
+  if (bounds.length === 1) mapaInstance.setView(bounds[0], 14);
+  else if (bounds.length > 1) mapaInstance.fitBounds(bounds, { padding: [40, 40] });
+  setTimeout(() => mapaInstance.invalidateSize(), 100);
+}
+
+function buildPopupHTML(emp, alumnosActuales, alumnosHistorico, curso) {
+  const nAct = alumnosActuales.length;
+  const nHist = alumnosHistorico.length;
+
+  let html = `<div class="emp-popup">
+    <div class="emp-popup-header">
+      <div class="emp-popup-name">🏢 ${emp.nombre}</div>
+      <div class="emp-popup-meta">${emp.cif}${emp.sector ? ' · ' + emp.sector : ''}</div>
+    </div>`;
+
+  if (emp.direccion) {
+    html += `<div class="emp-popup-row"><b>📍 Dirección</b>${emp.direccion}</div>`;
+  }
+  if (emp.contactoNombre) {
+    html += `<div class="emp-popup-row"><b>👤 Contacto</b>${emp.contactoNombre}${emp.contactoCargo ? ' ('+emp.contactoCargo+')' : ''}</div>`;
+  }
+  if (emp.contactoTel) {
+    html += `<div class="emp-popup-row"><b>📞 Teléfono</b><a href="tel:${emp.contactoTel}" style="color:var(--az)">${emp.contactoTel}</a></div>`;
+  }
+  if (emp.contactoEmail) {
+    html += `<div class="emp-popup-row"><b>✉️ Email</b><a href="mailto:${emp.contactoEmail}" style="color:var(--az)">${emp.contactoEmail}</a></div>`;
+  }
+
+  // Alumnado actual
+  html += `<div class="emp-popup-section">Alumnado ${curso} (${nAct})</div>`;
+  if (nAct > 0) {
+    html += '<div style="line-height:1.8">';
+    alumnosActuales.forEach(a => {
+      html += `<span class="emp-alumno-chip">👤 ${a.apellidos}, ${a.nombre} <span style="opacity:0.7;font-size:10px">${a.nivel||''}</span></span>`;
+    });
+    html += '</div>';
+  } else {
+    html += `<div style="font-size:12px;color:var(--gray4);font-style:italic">Sin alumnado en este curso</div>`;
+  }
+
+  // Histórico (otros cursos)
+  if (nHist > 0) {
+    const cursosHist = [...new Set(alumnosHistorico.map(a=>a.curso))].sort().reverse();
+    html += `<div class="emp-popup-section">Histórico (${nHist} en ${cursosHist.length} curso${cursosHist.length>1?'s':''})</div>`;
+    html += '<div style="line-height:1.8">';
+    alumnosHistorico.slice(0,6).forEach(a => {
+      html += `<span class="emp-alumno-chip old">📋 ${a.apellidos} <span style="opacity:0.6">${a.curso}</span></span>`;
+    });
+    if (nHist > 6) html += `<span style="font-size:11px;color:var(--gray4)"> +${nHist-6} más…</span>`;
+    html += '</div>';
+  }
+
+  if (emp.obs) {
+    html += `<div style="margin-top:8px;font-size:12px;color:var(--gray3);font-style:italic;border-top:1px solid var(--gray6);padding-top:8px">${emp.obs}</div>`;
+  }
+
+  html += `<button class="emp-popup-btn">📋 Ver ficha completa</button>`;
+  html += '</div>';
+  return html;
+}
+
+function filtrarMapa() {
+  if (!mapaIniciado) return;
+  renderMapaMarkers();
+}
+
+
+
+
+
+
+
+
+
+</script>
+
+<!-- ── LOGIN OVERLAY ── -->
+<div id="loginOverlay" style="display:none;position:fixed;inset:0;background:rgba(26,39,68,0.85);z-index:9999;backdrop-filter:blur(4px);align-items:center;justify-content:center;font-family:var(--font)">
+  <div style="background:white;border-radius:12px;width:380px;max-width:95vw;box-shadow:0 20px 60px rgba(26,39,68,0.4);overflow:hidden;animation:popIn 0.2s ease">
+    <div style="background:var(--az);padding:28px 32px 22px;text-align:center">
+      <div style="background:var(--gold);color:var(--az);font-family:'Crimson Pro',serif;font-size:20px;font-weight:700;padding:6px 14px;border-radius:6px;display:inline-block;margin-bottom:12px">FEOE</div>
+      <div style="font-family:'Crimson Pro',serif;font-size:20px;color:white;font-weight:600">FP Aragón</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.65);margin-top:4px">Formación en Empresa u Organismo Equiparado</div>
+    </div>
+    <div style="padding:28px 32px">
+      <div id="loginError" style="display:none;background:#fff0f0;border:1.5px solid #e8b0b0;border-radius:6px;padding:9px 14px;font-size:13px;color:#8b1a1a;margin-bottom:16px"></div>
+      <div style="margin-bottom:14px">
+        <label style="font-size:13px;font-weight:600;color:var(--az);display:block;margin-bottom:5px">Usuario</label>
+        <input id="loginUser" type="text" autocomplete="username" placeholder="admin"
+          style="width:100%;padding:10px 12px;border:1.5px solid var(--gray5);border-radius:6px;font-family:var(--font);font-size:14px;outline:none"
+          onfocus="this.style.borderColor='var(--az)'" onblur="this.style.borderColor='var(--gray5)'"
+          onkeydown="if(event.key==='Enter')doLogin()">
+      </div>
+      <div style="margin-bottom:22px">
+        <label style="font-size:13px;font-weight:600;color:var(--az);display:block;margin-bottom:5px">Contraseña</label>
+        <input id="loginPass" type="password" autocomplete="current-password" placeholder="••••••••"
+          style="width:100%;padding:10px 12px;border:1.5px solid var(--gray5);border-radius:6px;font-family:var(--font);font-size:14px;outline:none"
+          onfocus="this.style.borderColor='var(--az)'" onblur="this.style.borderColor='var(--gray5)'"
+          onkeydown="if(event.key==='Enter')doLogin()">
+      </div>
+      <button onclick="doLogin()" id="loginBtn"
+        style="width:100%;padding:11px;background:var(--gold);color:var(--az);border:none;border-radius:6px;font-family:var(--font);font-size:14px;font-weight:700;cursor:pointer">
+        Iniciar sesión
+      </button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
