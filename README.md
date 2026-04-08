@@ -1,2 +1,2 @@
-# FEOEs-FP-Arag-n
+# FEOEs-FP-Aragon
 Gestión de FEOES en FP - Formación en Empresa u Organismo Equiparado - FP Aragón
