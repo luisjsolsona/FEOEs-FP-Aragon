@@ -1200,21 +1200,21 @@ window.addEventListener('unhandledrejection', function(e) {
         <div class="form-row col2">
           <div class="form-group">
             <label>Apellidos *</label>
-            <input type="text" id="aApellidos" placeholder="García Martínez">
+            <input type="text" id="aApellidos" placeholder="García Martínez" oninput="autoGuardarAlumno()">
           </div>
           <div class="form-group">
             <label>Nombre *</label>
-            <input type="text" id="aNombre" placeholder="Carlos">
+            <input type="text" id="aNombre" placeholder="Carlos" oninput="autoGuardarAlumno()">
           </div>
         </div>
         <div class="form-row col2">
           <div class="form-group">
             <label>DNI/NIE *</label>
-            <input type="text" id="aDni" placeholder="12345678A" class="mono">
+            <input type="text" id="aDni" placeholder="12345678A" class="mono" oninput="autoGuardarAlumno()">
           </div>
           <div class="form-group">
             <label>Familia Profesional</label>
-            <select id="aFamilia">
+            <select id="aFamilia" onchange="autoGuardarAlumno()">
               <option value="">Selecciona…</option>
               <option>INFORMÁTICA Y COMUNICACIONES</option>
               <option>ADMINISTRACIÓN Y GESTIÓN</option>
@@ -1269,7 +1269,7 @@ window.addEventListener('unhandledrejection', function(e) {
         <div class="form-row col2" style="margin-bottom:10px">
           <div class="form-group">
             <label>Curso académico *</label>
-            <select id="aCurso">
+            <select id="aCurso" onchange="autoGuardarEstancia()">
               <option value="">Selecciona…</option>
               <option>2025-2026</option>
               <option>2024-2025</option>
@@ -1280,7 +1280,7 @@ window.addEventListener('unhandledrejection', function(e) {
           </div>
           <div class="form-group">
             <label>Nivel / Ciclo</label>
-            <select id="aNivel">
+            <select id="aNivel" onchange="autoGuardarEstancia()">
               <option value="">Selecciona…</option>
               <optgroup label="Grado Básico">
                 <option value="1CFGB">1º CFGB</option>
@@ -1306,7 +1306,7 @@ window.addEventListener('unhandledrejection', function(e) {
           <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.6);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:8px">Empresa</div>
           <div class="form-row" style="margin-bottom:8px">
             <div class="form-group">
-              <select id="aEmpresa" onchange="autocompletarEmpresa()"
+              <select id="aEmpresa" onchange="autocompletarEmpresa();autoGuardarEstancia()"
                 style="background:rgba(255,255,255,0.12);color:white;border:1px solid rgba(255,255,255,0.25);font-size:13px">
                 <option value="" style="color:var(--gray1)">— Seleccionar empresa registrada —</option>
               </select>
@@ -1315,12 +1315,12 @@ window.addEventListener('unhandledrejection', function(e) {
           <div class="form-row col2" style="margin-bottom:0">
             <div class="form-group">
               <label style="color:rgba(255,255,255,0.7);font-size:11px">Nombre empresa</label>
-              <input type="text" id="aEmpresaNombre" placeholder="Empresa S.L."
+              <input type="text" id="aEmpresaNombre" placeholder="Empresa S.L." oninput="autoGuardarEstancia()"
                 style="background:rgba(255,255,255,0.12);color:white;border:1px solid rgba(255,255,255,0.2);font-size:13px">
             </div>
             <div class="form-group">
               <label style="color:rgba(255,255,255,0.7);font-size:11px">CIF</label>
-              <input type="text" id="aEmpresaCif" placeholder="B12345678" class="mono"
+              <input type="text" id="aEmpresaCif" placeholder="B12345678" class="mono" oninput="autoGuardarEstancia()"
                 style="background:rgba(255,255,255,0.12);color:white;border:1px solid rgba(255,255,255,0.2);font-size:13px">
             </div>
           </div>
@@ -1330,17 +1330,17 @@ window.addEventListener('unhandledrejection', function(e) {
         <div class="form-row col2" style="margin-bottom:10px">
           <div class="form-group">
             <label>Periodo inicio</label>
-            <input type="date" id="aPeriodoIni">
+            <input type="date" id="aPeriodoIni" onchange="autoGuardarEstancia()">
           </div>
           <div class="form-group">
             <label>Periodo fin</label>
-            <input type="date" id="aPeriodoFin">
+            <input type="date" id="aPeriodoFin" onchange="autoGuardarEstancia()">
           </div>
         </div>
         <div class="form-row" style="margin-bottom:10px">
           <div class="form-group">
             <label>Contacto empresa</label>
-            <input type="text" id="aContacto" placeholder="Nombre, cargo, teléfono…">
+            <input type="text" id="aContacto" placeholder="Nombre, cargo, teléfono…" oninput="autoGuardarEstancia()">
           </div>
         </div>
 
@@ -1348,11 +1348,11 @@ window.addEventListener('unhandledrejection', function(e) {
         <div class="form-row col2" style="margin-bottom:10px">
           <div class="form-group">
             <label>Obs. empresa</label>
-            <textarea id="aObsEmpresa" placeholder="Notas sobre la empresa…" style="min-height:50px"></textarea>
+            <textarea id="aObsEmpresa" placeholder="Notas sobre la empresa…" style="min-height:50px" oninput="autoGuardarEstancia()"></textarea>
           </div>
           <div class="form-group">
             <label>Obs. alumno/a</label>
-            <textarea id="aObsAlumno" placeholder="Rendimiento, incidencias…" style="min-height:50px"></textarea>
+            <textarea id="aObsAlumno" placeholder="Rendimiento, incidencias…" style="min-height:50px" oninput="autoGuardarEstancia()"></textarea>
           </div>
         </div>
 
@@ -1360,7 +1360,7 @@ window.addEventListener('unhandledrejection', function(e) {
         <div class="form-row col2" style="margin-bottom:10px">
           <div class="form-group">
             <label>Calificación FEOE</label>
-            <select id="aCalificacion">
+            <select id="aCalificacion" onchange="autoGuardarEstancia()">
               <option value="">— Sin calificar —</option>
               <option value="Apto">Apto</option>
               <option value="No Apto">No Apto</option>
@@ -1371,7 +1371,7 @@ window.addEventListener('unhandledrejection', function(e) {
           </div>
           <div class="form-group">
             <label>Supervisado por</label>
-            <select id="aSupervisor"><option value="">— Sin asignar —</option></select>
+            <select id="aSupervisor" onchange="autoGuardarEstancia()"><option value="">— Sin asignar —</option></select>
           </div>
         </div>
 
@@ -1415,7 +1415,7 @@ window.addEventListener('unhandledrejection', function(e) {
         <!-- Botones del formulario estancia -->
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;padding-top:12px;border-top:1px solid var(--gray5)">
           <button class="btn btn-ghost btn-sm" onclick="cancelarFormEstancia()">Cancelar</button>
-          <button class="btn btn-primary btn-sm" onclick="guardarEstancia()">
+          <button id="btnGuardarEstancia" class="btn btn-primary btn-sm" onclick="guardarEstancia()">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
             Guardar estancia
           </button>
@@ -1426,7 +1426,7 @@ window.addEventListener('unhandledrejection', function(e) {
     </div>
     <div class="panel-footer">
       <button class="btn btn-ghost" onclick="cerrarPanel('overlayAlumno')">Cerrar</button>
-      <button class="btn btn-primary" onclick="guardarAlumno()">
+      <button id="btnGuardarAlumno" class="btn btn-primary" onclick="guardarAlumno()">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
         Guardar alumno
       </button>
@@ -1451,23 +1451,23 @@ window.addEventListener('unhandledrejection', function(e) {
         <div class="form-row">
           <div class="form-group">
             <label>Nombre de la empresa *</label>
-            <input type="text" id="eNombre" placeholder="Empresa Tecnológica S.L.">
+            <input type="text" id="eNombre" placeholder="Empresa Tecnológica S.L." oninput="autoGuardarEmpresa()">
           </div>
         </div>
         <div class="form-row col2">
           <div class="form-group">
             <label>CIF *</label>
-            <input type="text" id="eCif" placeholder="B12345678" class="mono">
+            <input type="text" id="eCif" placeholder="B12345678" class="mono" oninput="autoGuardarEmpresa()">
           </div>
           <div class="form-group">
             <label>Sector / Actividad</label>
-            <input type="text" id="eSector" placeholder="Informática, Telecomunicaciones…">
+            <input type="text" id="eSector" placeholder="Informática, Telecomunicaciones…" oninput="autoGuardarEmpresa()">
           </div>
         </div>
         <div class="form-row">
           <div class="form-group">
             <label>Dirección</label>
-            <input type="text" id="eDireccion" placeholder="C/ Ejemplo, 1 — Zaragoza">
+            <input type="text" id="eDireccion" placeholder="C/ Ejemplo, 1 — Zaragoza" oninput="autoGuardarEmpresa()">
           </div>
         </div>
       </div>
@@ -1476,21 +1476,21 @@ window.addEventListener('unhandledrejection', function(e) {
         <div class="form-row col2">
           <div class="form-group">
             <label>Nombre contacto</label>
-            <input type="text" id="eContactoNombre" placeholder="María López">
+            <input type="text" id="eContactoNombre" placeholder="María López" oninput="autoGuardarEmpresa()">
           </div>
           <div class="form-group">
             <label>Cargo</label>
-            <input type="text" id="eContactoCargo" placeholder="Jefa de RRHH">
+            <input type="text" id="eContactoCargo" placeholder="Jefa de RRHH" oninput="autoGuardarEmpresa()">
           </div>
         </div>
         <div class="form-row col2">
           <div class="form-group">
             <label>Teléfono</label>
-            <input type="text" id="eContactoTel" placeholder="976 000 000" class="mono">
+            <input type="text" id="eContactoTel" placeholder="976 000 000" class="mono" oninput="autoGuardarEmpresa()">
           </div>
           <div class="form-group">
             <label>Email</label>
-            <input type="text" id="eContactoEmail" placeholder="contacto@empresa.com">
+            <input type="text" id="eContactoEmail" placeholder="contacto@empresa.com" oninput="autoGuardarEmpresa()">
           </div>
         </div>
       </div>
@@ -1499,14 +1499,14 @@ window.addEventListener('unhandledrejection', function(e) {
         <div class="form-row">
           <div class="form-group">
             <label>Observaciones generales</label>
-            <textarea id="eObs" placeholder="Historial de colaboración, valoración general, condiciones…"></textarea>
+            <textarea id="eObs" placeholder="Historial de colaboración, valoración general, condiciones…" oninput="autoGuardarEmpresa()"></textarea>
           </div>
         </div>
       </div>
     </div>
     <div class="panel-footer">
       <button class="btn btn-ghost" onclick="cerrarPanel('overlayEmpresa')">Cancelar</button>
-      <button class="btn btn-primary" onclick="guardarEmpresa()">
+      <button id="btnGuardarEmpresa" class="btn btn-primary" onclick="guardarEmpresa()">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
         Guardar
       </button>
@@ -1617,6 +1617,112 @@ const ROLE_LEVEL = { admin: 4, tutor: 3, profe: 2, invitado: 1 };
 
 
 
+
+// ═══════════════════════════════════════════
+//  AUTO-SAVE
+// ═══════════════════════════════════════════
+const _autoTimers = {};
+
+function _mostrarBtnGuardar(btnId, visible) {
+  const btn = document.getElementById(btnId);
+  if (btn) btn.style.display = visible ? '' : 'none';
+}
+
+function _debounceSave(key, fn, ms = 900) {
+  clearTimeout(_autoTimers[key]);
+  setSaveIndicator('pending');
+  _autoTimers[key] = setTimeout(async () => {
+    try { await fn(); setSaveIndicator('saved'); }
+    catch { setSaveIndicator('error'); }
+  }, ms);
+}
+
+function autoGuardarAlumno() {
+  const id = parseInt(document.getElementById('alumnoId').value);
+  if (!id) return;
+  _debounceSave('alumno', async () => {
+    const body = {
+      apellidos: document.getElementById('aApellidos').value.trim(),
+      nombre:    document.getElementById('aNombre').value.trim(),
+      dni:       document.getElementById('aDni').value.trim(),
+      familia:   document.getElementById('aFamilia').value,
+    };
+    if (!body.apellidos || !body.nombre || !body.dni) return;
+    await Alumnado.update(id, body);
+    const a = state.alumnado.find(x => x.id === id);
+    if (a) Object.assign(a, body);
+    renderTabla();
+  });
+}
+
+function autoGuardarEstancia() {
+  const estId = parseInt(document.getElementById('estanciaId').value);
+  if (!estId) return;
+  const alumnoId = parseInt(document.getElementById('alumnoId').value);
+  if (!alumnoId) return;
+  _debounceSave('estancia', async () => {
+    const curso = document.getElementById('aCurso').value;
+    if (!curso) return;
+    const supEl  = document.getElementById('aSupervisor');
+    const supOpt = supEl?.options[supEl.selectedIndex];
+    const body = {
+      alumno_id:        alumnoId,
+      curso,
+      nivel:            document.getElementById('aNivel').value,
+      empresa_id:       parseInt(document.getElementById('aEmpresa').value) || null,
+      empresa_nombre:   document.getElementById('aEmpresaNombre').value.trim(),
+      empresa_cif:      document.getElementById('aEmpresaCif').value.trim(),
+      periodo_ini:      document.getElementById('aPeriodoIni').value,
+      periodo_fin:      document.getElementById('aPeriodoFin').value,
+      contacto:         document.getElementById('aContacto').value.trim(),
+      obs_empresa:      document.getElementById('aObsEmpresa').value.trim(),
+      obs_alumno:       document.getElementById('aObsAlumno').value.trim(),
+      calificacion:     document.getElementById('aCalificacion').value,
+      supervisor_id:    parseInt(supEl?.value) || null,
+      supervisor_nombre: (supOpt && supOpt.value) ? (supOpt.dataset.nombre || '') : '',
+    };
+    await Estancias.update(estId, body);
+    updateEstanciaLocal(estId, {
+      curso, nivel: body.nivel, empresaId: body.empresa_id,
+      empresaNombre: body.empresa_nombre, empresaCif: body.empresa_cif,
+      periodoIni: body.periodo_ini, periodoFin: body.periodo_fin,
+      contacto: body.contacto, obsEmpresa: body.obs_empresa,
+      obsAlumno: body.obs_alumno, calificacion: body.calificacion,
+      supervisorId: body.supervisor_id, supervisorNombre: body.supervisor_nombre,
+    });
+    renderListaEstancias(alumnoId);
+  });
+}
+
+function autoGuardarEmpresa() {
+  const id = parseInt(document.getElementById('empresaId').value);
+  if (!id) return;
+  _debounceSave('empresa', async () => {
+    const nombre = document.getElementById('eNombre').value.trim();
+    const cif    = document.getElementById('eCif').value.trim();
+    if (!nombre || !cif) return;
+    const body = {
+      nombre, cif,
+      sector:          document.getElementById('eSector').value.trim(),
+      direccion:       document.getElementById('eDireccion').value.trim(),
+      contacto_nombre: document.getElementById('eContactoNombre').value.trim(),
+      contacto_cargo:  document.getElementById('eContactoCargo').value.trim(),
+      contacto_tel:    document.getElementById('eContactoTel').value.trim(),
+      contacto_email:  document.getElementById('eContactoEmail').value.trim(),
+      obs:             document.getElementById('eObs').value.trim(),
+    };
+    const old = state.empresas.find(e => e.id === id);
+    if (old && body.direccion !== old.direccion) delete geocacheMap[old.cif];
+    await Empresas.update(id, body);
+    const e = state.empresas.find(x => x.id === id);
+    if (e) Object.assign(e, {
+      nombre: body.nombre, cif: body.cif, sector: body.sector,
+      direccion: body.direccion, contactoNombre: body.contacto_nombre,
+      contactoCargo: body.contacto_cargo, contactoTel: body.contacto_tel,
+      contactoEmail: body.contacto_email, obs: body.obs,
+    });
+  });
+}
 
 // ═════════════════════════════════<script>
 
@@ -1889,6 +1995,7 @@ function abrirPanelAlumno(id) {
     document.getElementById('aFamilia').value = '';
     document.getElementById('seccionEstancias').style.display = 'none';
     mostrarFormEstancia(null);
+    _mostrarBtnGuardar('btnGuardarAlumno', true);
   } else {
     const a = state.alumnado.find(x => x.id === id);
     document.getElementById('alumnoId').value   = a.id;
@@ -1899,6 +2006,7 @@ function abrirPanelAlumno(id) {
     document.getElementById('seccionEstancias').style.display = 'block';
     renderListaEstancias(a.id);
     mostrarFormEstancia(null);
+    _mostrarBtnGuardar('btnGuardarAlumno', false);
   }
   document.getElementById('overlayAlumno')?.classList.add('open');
 }
@@ -2043,7 +2151,11 @@ function mostrarFormEstancia(estanciaId) {
     document.getElementById('aEmpresa').value='';
   }
   const fe = document.getElementById('formEstancia');
-  if (fe) { fe.style.display = 'block'; fe.scrollIntoView({behavior:'smooth',block:'nearest'}); }
+  if (fe) {
+    fe.style.display = estanciaId ? 'block' : 'none';
+    if (estanciaId) fe.scrollIntoView({behavior:'smooth',block:'nearest'});
+  }
+  _mostrarBtnGuardar('btnGuardarEstancia', !estanciaId);
   // Cargar seguimientos si es edicion
   const segCont = document.getElementById('seguimientosContainer');
   if (estanciaId && segCont) {
@@ -2082,6 +2194,7 @@ function abrirPanelEmpresa(id) {
   document.getElementById('panelEmpresaTitle').textContent = id === null ? 'Nueva empresa' : 'Editar empresa';
   if (id === null) {
     ['empresaId','eNombre','eCif','eSector','eDireccion','eContactoNombre','eContactoCargo','eContactoTel','eContactoEmail','eObs'].forEach(f => document.getElementById(f).value = '');
+    _mostrarBtnGuardar('btnGuardarEmpresa', true);
   } else {
     const e = state.empresas.find(x => x.id === id);
     document.getElementById('empresaId').value = e.id;
@@ -2094,6 +2207,7 @@ function abrirPanelEmpresa(id) {
     document.getElementById('eContactoTel').value = e.contactoTel || '';
     document.getElementById('eContactoEmail').value = e.contactoEmail || '';
     document.getElementById('eObs').value = e.obs || '';
+    _mostrarBtnGuardar('btnGuardarEmpresa', false);
   }
   document.getElementById('overlayEmpresa')?.classList.add('open');
 }
@@ -2146,7 +2260,7 @@ function renderEmpresas() {
           ${mapaBadge}
           <span class="badge badge-curso">${ests.length} estancias</span>
           <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation();abrirPanelEmpresa(${e.id})">✏️ Editar</button>
-          ${isAdmin() ? `<!-- empresa del btn placeholder',${e.id},'${esc(e.nombre)}')">🗑</button>` : ''}
+          ${isAdmin() ? `<button class="btn btn-sm btn-ghost" style="color:var(--red)" onclick="event.stopPropagation();solicitarEliminar('empresa',${e.id},'${esc(e.nombre)}')">🗑 Borrar</button>` : ''}
         </div>
       </div>
       <div class="empresa-card-body" id="empcard-${e.id}" style="display:none">
@@ -2188,7 +2302,7 @@ function renderPendientes() {
   const pendientes = state.pendientes.filter(p => !p.resuelto);
 
   if (!pendientes.length) {
-    list.innerHTML = `<div class="empty-state"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg><p>No hay solicitudes pendientes.</p></div>`;
+    list.innerHTML = `<div class="empty-state"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg><p>No hay solicitudes pendientes.</p><p style="font-size:12px;color:var(--gray4);margin-top:6px;max-width:360px">Los pendientes aparecen cuando un profesor solicita eliminar un alumno o estancia. Un administrador debe aprobar o rechazar la solicitud.</p></div>`;
     return;
   }
 
@@ -2701,6 +2815,7 @@ async function guardarAlumno() {
     if(!idEl){
       const {alumno}=await Alumnado.create(body);
       alumnoId=alumno.id; document.getElementById('alumnoId').value=alumnoId;
+      _mostrarBtnGuardar('btnGuardarAlumno', false);
       addHistorial('new','Alta alumno: '+apellidos+' '+nombre);
       toast('Alumno añadido. Añade su estancia FEOE abajo.','success');
     } else {

@@ -22,16 +22,18 @@ Aplicación de gestión de **Formación en Empresa u Organismo Equiparado** para
 └─────────────────────────────────────┘
 ```
 
-## Arranque rápido
+## Instalación y arranque
 
 ```bash
-# 1. Clonar / descomprimir el proyecto
-cd feoe-docker
+# 1. Clonar el repositorio
+git clone https://github.com/luisjsolsona/FEOEs-FP-Aragon.git
+cd FEOEs-FP-Aragon
 
-# 2. (Opcional) Cambiar credenciales en docker-compose.yml:
-#    JWT_SECRET y ADMIN_PASSWORD
+# 2. Crear el fichero de configuración a partir de la plantilla
+cp .env.example .env
+# Edita .env y cambia JWT_SECRET y ADMIN_PASSWORD por valores propios
 
-# 3. Arrancar
+# 3. Arrancar los contenedores
 docker-compose up -d
 
 # 4. Abrir en el navegador
@@ -40,7 +42,7 @@ http://localhost:5000
 
 Login por defecto: `admin` / `admin1234`
 
-> ⚠️ Cambia la contraseña tras el primer inicio de sesión.
+> ⚠️ Cambia la contraseña tras el primer inicio de sesión (`Usuarios → ··· → Cambiar contraseña`).
 
 ## Comandos útiles
 

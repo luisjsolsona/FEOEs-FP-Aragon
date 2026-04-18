@@ -13,7 +13,7 @@ function validarCoordenadas(lat, lon) {
 }
 
 // GET /api/empresas
-router.get('/', requireProfe, (req, res) => {
+router.get('/', requireAuth, (req, res) => {
   const empresas = db.prepare(`SELECT * FROM empresas WHERE deleted = 0 ORDER BY nombre ASC`).all();
   res.json({ empresas });
 });
@@ -45,8 +45,8 @@ router.post('/', requireProfe, (req, res) => {
   res.status(201).json({ empresa: { id: r.lastInsertRowid, ...req.body, cif: cif.toUpperCase() } });
 });
 
-// PUT /api/empresas/:id — requiere al menos tutor
-router.put('/:id', requireTutor, (req, res) => {
+// PUT /api/empresas/:id — requiere al menos profe (permite guardar coords geocodificadas)
+router.put('/:id', requireProfe, (req, res) => {
   const id = parseInt(req.params.id);
   const e = db.prepare('SELECT * FROM empresas WHERE id = ?').get(id);
   if (!e) return res.status(404).json({ error: 'Empresa no encontrada.' });
