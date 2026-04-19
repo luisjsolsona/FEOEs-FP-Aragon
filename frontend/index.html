@@ -1732,39 +1732,52 @@ function buscarDireccionAuto() {
   sug.style.display = 'block';
 
   _geoSugTimer = setTimeout(async () => {
+    const q = val + ', España';
+    const qs = new URLSearchParams({ q, format: 'json', limit: '6', countrycodes: 'es', addressdetails: '1' });
+
+    // Intenta obtener resultados: primero directo a Nominatim (sin cabeceras extra),
+    // si falla (CORS / red) usa el proxy del backend.
+    let data = null;
+    let errMsg = '';
     try {
-      // Llamada directa a Nominatim desde el navegador (no requiere proxy)
-      const params = new URLSearchParams({
-        q: val + ', España',
-        format: 'json', limit: '6', countrycodes: 'es', addressdetails: '1',
-      });
-      const r = await fetch('https://nominatim.openstreetmap.org/search?' + params, {
-        headers: { 'Accept-Language': 'es,es-ES' },
-      });
-      const data = await r.json();
-      if (!Array.isArray(data) || !data.length) {
-        sug.innerHTML = '<div style="padding:10px 12px;font-size:12px;color:var(--gray3)">Sin resultados. Prueba escribiendo solo el nombre de la calle y la ciudad.</div>';
-        return;
+      const r = await fetch('https://nominatim.openstreetmap.org/search?' + qs);
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      data = await r.json();
+    } catch (e1) {
+      errMsg = e1.message;
+      try {
+        const r2 = await fetch('/api/geocode?' + new URLSearchParams({ q }), { credentials: 'include' });
+        if (!r2.ok) throw new Error('proxy HTTP ' + r2.status);
+        data = await r2.json();
+        errMsg = '';
+      } catch (e2) {
+        errMsg += ' · proxy: ' + e2.message;
       }
-      sug.innerHTML = data.slice(0, 6).map(item => {
-        const a = item.address || {};
-        // Usar el nombre real de la vía de OSM (incluye artículos: "del", "de la"…)
-        const road   = a.road || a.pedestrian || a.footway || a.path || item.display_name.split(',')[0];
-        const num    = a.house_number || '';
-        const cp     = a.postcode || '';
-        const ciudad = a.city || a.town || a.village || a.municipality || '';
-        const linea1 = [road, num].filter(Boolean).join(', ');
-        const linea2 = [cp, ciudad].filter(Boolean).join(', ');
-        const dirLimpia = [linea1, linea2].filter(Boolean).join(', ');
-        return `<div class="geo-sug-item" onmousedown="seleccionarDireccionOSM(${JSON.stringify(dirLimpia)}, ${item.lat}, ${item.lon})">
-          <div class="sug-main">${escHtml(linea1)}${linea2 ? '<span style="font-weight:400;color:var(--gray3)"> — '+escHtml(linea2)+'</span>' : ''}</div>
-          <div class="sug-sub">${escHtml(item.display_name)}</div>
-        </div>`;
-      }).join('');
-      sug.style.display = 'block';
-    } catch (e) {
-      sug.innerHTML = '<div style="padding:10px 12px;font-size:12px;color:var(--red)">Error al buscar. Comprueba la conexión.</div>';
     }
+
+    if (!Array.isArray(data) || !data.length) {
+      sug.innerHTML = `<div style="padding:10px 12px;font-size:12px;color:var(--gray3)">
+        Sin resultados${errMsg ? ' <span style="color:var(--red);font-size:10px">('+escHtml(errMsg)+')</span>' : ''}.
+        Prueba solo con el nombre de la calle y la ciudad.
+      </div>`;
+      return;
+    }
+
+    sug.innerHTML = data.slice(0, 6).map(item => {
+      const a = item.address || {};
+      const road   = a.road || a.pedestrian || a.footway || a.path || item.display_name.split(',')[0];
+      const num    = a.house_number || '';
+      const cp     = a.postcode || '';
+      const ciudad = a.city || a.town || a.village || a.municipality || '';
+      const linea1 = [road, num].filter(Boolean).join(', ');
+      const linea2 = [cp, ciudad].filter(Boolean).join(', ');
+      const dirLimpia = [linea1, linea2].filter(Boolean).join(', ');
+      return `<div class="geo-sug-item" onmousedown="seleccionarDireccionOSM(${JSON.stringify(dirLimpia)}, ${item.lat}, ${item.lon})">
+        <div class="sug-main">${escHtml(linea1)}${linea2 ? '<span style="font-weight:400;color:var(--gray3)"> — '+escHtml(linea2)+'</span>' : ''}</div>
+        <div class="sug-sub">${escHtml(item.display_name)}</div>
+      </div>`;
+    }).join('');
+    sug.style.display = 'block';
   }, 450);
 
   autoGuardarEmpresa();
