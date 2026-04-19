@@ -3560,10 +3560,12 @@ async function geocodificarTodas(forzar = false) {
 // Parsea el formato habitual español: "Calle X, N, CP, Ciudad"
 // Intenta primero con parámetros estructurados (más preciso), luego con query libre.
 async function geocodificarDireccion(dir) {
+  // Proxy a través del backend para evitar bloqueos CORS del navegador
   const fetchN = async (params) => {
-    const url = 'https://nominatim.openstreetmap.org/search?' +
-      new URLSearchParams({ ...params, format: 'json', limit: '3', countrycodes: 'es', addressdetails: '1' });
-    const res = await fetch(url, { referrerPolicy: 'no-referrer', headers: { 'Accept-Language': 'es' } });
+    const endpoint = Object.keys(params).some(k => ['street','postalcode','city','country'].includes(k))
+      ? '/api/geocode/structured?' + new URLSearchParams(params)
+      : '/api/geocode?' + new URLSearchParams({ q: Object.values(params)[0] });
+    const res = await fetch(endpoint, { credentials: 'include' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
   };
@@ -3619,9 +3621,7 @@ async function geocodificarDireccion(dir) {
   }
 
   // Intento 4: query libre como último recurso
-  const qEnc = encodeURIComponent(dirN + ', España');
-  const r = await fetch(`https://nominatim.openstreetmap.org/search?q=${qEnc}&format=json&limit=1&countrycodes=es`,
-    { referrerPolicy: 'no-referrer', headers: { 'Accept-Language': 'es' } });
+  const r = await fetch('/api/geocode?' + new URLSearchParams({ q: dirN + ', España' }), { credentials: 'include' });
   const dl = await r.json();
   if (dl && dl.length > 0) return { lat: parseFloat(dl[0].lat), lon: parseFloat(dl[0].lon) };
 
