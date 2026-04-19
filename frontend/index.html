@@ -3432,6 +3432,7 @@ let mapaMarkers = [];
 let mapaIniciado = false;
 let geocacheMap = {}; // cif → {lat, lon}
 let geocodificando = false;
+let geocodificadoIntentado = new Set(); // CIFs ya intentados en esta sesión (evita reintentos)
 
 function iniciarMapa() {
   // Poblar filtro curso del mapa
@@ -3458,7 +3459,16 @@ function iniciarMapa() {
     mapaIniciado = true;
   }
 
-  geocodificarTodas();
+  // Solo geocodificar si hay empresas con dirección que no tienen coords y no han sido intentadas
+  const hayNuevasPendientes = state.empresas.some(e =>
+    !e.deleted && e.direccion && e.direccion.trim() && !e.lat && !e.lon && !geocodificadoIntentado.has(e.cif)
+  );
+  if (hayNuevasPendientes) {
+    geocodificarTodas();
+  } else {
+    document.getElementById('mapaLoader').style.display = 'none';
+    renderMapaMarkers();
+  }
 }
 
 async function geocodificarTodas(forzar = false) {
@@ -3484,13 +3494,14 @@ async function geocodificarTodas(forzar = false) {
       }
     });
   } else {
-    // Forzar: limpiar caché y coords de todas
+    // Forzar: limpiar caché, coords y reintentos de todas
     geocacheMap = {};
+    geocodificadoIntentado = new Set();
     state.empresas.forEach(e => { delete e.lat; delete e.lon; });
   }
 
-  // Empresas que necesitan geocodificarse (no están en caché)
-  const pendientes = conDir.filter(e => !geocacheMap[e.cif]);
+  // Empresas que necesitan geocodificarse: sin coords en caché y no intentadas aún en esta sesión
+  const pendientes = conDir.filter(e => !geocacheMap[e.cif] && !geocodificadoIntentado.has(e.cif));
   let ok = 0, fail = 0;
 
   if (pendientes.length === 0) {
@@ -3508,6 +3519,7 @@ async function geocodificarTodas(forzar = false) {
     loaderMsg.textContent = `Geolocalizando "${emp.nombre}"… (${i + 1}/${pendientes.length})`;
     try {
       const coords = await geocodificarDireccion(emp.direccion.trim());
+      geocodificadoIntentado.add(emp.cif);
       if (coords) {
         geocacheMap[emp.cif] = coords;
         emp.lat = coords.lat;
@@ -3518,6 +3530,7 @@ async function geocodificarTodas(forzar = false) {
         console.warn(`Sin resultados para: ${emp.nombre} → "${emp.direccion}"`);
       }
     } catch (err) {
+      geocodificadoIntentado.add(emp.cif);
       fail++;
       console.warn(`Error geocodificando ${emp.nombre}:`, err.message);
     }
@@ -3615,6 +3628,36 @@ async function geocodificarDireccion(dir) {
   return null;
 }
 
+async function geocodificarEmpresa(empresaId) {
+  const emp = state.empresas.find(e => e.id === empresaId);
+  if (!emp || !emp.direccion || !emp.direccion.trim()) {
+    toast('Esta empresa no tiene dirección. Edítala primero.', 'warning');
+    return;
+  }
+  const btn = document.getElementById(`btnGeo_${empresaId}`);
+  if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+  geocodificadoIntentado.delete(emp.cif); // permitir reintento
+  try {
+    const coords = await geocodificarDireccion(emp.direccion.trim());
+    if (coords) {
+      emp.lat = coords.lat; emp.lon = coords.lon;
+      geocacheMap[emp.cif] = coords;
+      geocodificadoIntentado.add(emp.cif);
+      await Empresas.update(emp.id, { lat: emp.lat, lon: emp.lon });
+      toast(`"${emp.nombre}" geolocalizda correctamente`, 'success');
+      renderMapaMarkers();
+    } else {
+      geocodificadoIntentado.add(emp.cif);
+      toast(`No se encontró la dirección de "${emp.nombre}". Comprueba el formato.`, 'warning');
+      if (btn) { btn.disabled = false; btn.textContent = '📍 Reintentar'; }
+    }
+  } catch (err) {
+    geocodificadoIntentado.add(emp.cif);
+    toast('Error al geocodificar: ' + err.message, 'error');
+    if (btn) { btn.disabled = false; btn.textContent = '📍 Reintentar'; }
+  }
+}
+
 function aplicarCoordsDesdeCache() {
   state.empresas.forEach(e => {
     if (!e.lat && geocacheMap[e.cif]) {
@@ -3667,6 +3710,9 @@ function renderMapaMarkers() {
       } else {
         estadoIcon = '⚠️'; estadoTxt = 'Sin dirección'; estadoColor = 'var(--red)';
       }
+      const btnGeo = tieneDir && !tieneCoords
+        ? `<button id="btnGeo_${emp.id}" class="btn btn-sm" style="flex-shrink:0;padding:3px 8px;font-size:11px;background:#FFF4E0;color:#8B6000;border:1px solid #e0c060" onclick="geocodificarEmpresa(${emp.id})" title="Geocodificar solo esta empresa">📍 Geocodificar</button>`
+        : '';
       return `
         <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border:var(--border);border-radius:4px;background:var(--gray7)">
           <span style="font-size:16px">${estadoIcon}</span>
@@ -3676,6 +3722,7 @@ function renderMapaMarkers() {
             ${tieneDir ? `<div style="font-size:10px;color:var(--gray4);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${emp.direccion}</div>` : ''}
           </div>
           <span style="font-size:11px;font-weight:700;color:var(--az);font-family:var(--mono);flex-shrink:0">${nAct > 0 ? nAct+'👤' : ''}</span>
+          ${btnGeo}
           <button class="btn btn-sm btn-ghost" style="flex-shrink:0;padding:3px 7px;font-size:11px" onclick="abrirPanelEmpresa(${emp.id})" title="Editar empresa">✏️</button>
         </div>`;
     }).join('');
