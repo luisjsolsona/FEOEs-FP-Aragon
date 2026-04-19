@@ -759,6 +759,13 @@ window.addEventListener('unhandledrejection', function(e) {
 
   @keyframes spin { to { transform: rotate(360deg); } }
 
+  /* Autocompletado dirección */
+  .geo-sug-item { padding:9px 12px; cursor:pointer; border-bottom:1px solid var(--gray6); transition:background 0.1s; }
+  .geo-sug-item:last-child { border-bottom:none; }
+  .geo-sug-item:hover { background:var(--az-light); }
+  .geo-sug-item .sug-main { font-size:13px; font-weight:600; color:var(--az); }
+  .geo-sug-item .sug-sub  { font-size:11px; color:var(--gray4); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
   /* Mapa: evitar que Leaflet se superponga al header/nav */
   #view-mapa { position: relative; z-index: 0; }
   #mapaContainer { isolation: isolate; }
@@ -1470,10 +1477,17 @@ window.addEventListener('unhandledrejection', function(e) {
           </div>
         </div>
         <div class="form-row">
-          <div class="form-group">
-            <label>Dirección</label>
-            <input type="text" id="eDireccion" placeholder="Ej: Calle Goya, 12, Zaragoza" oninput="autoGuardarEmpresa()">
-            <div class="form-hint">📍 Para que el mapa la encuentre: escribe <b>nombre completo de calle + número + ciudad</b>. Ej: «Avenida Madrid, 45, Zaragoza» o «Calle Alfonso I, 7, Zaragoza». Evita abreviaturas (C/, Av., Pza.) y usa tildes. Tras guardar, ve a la pestaña <b>Mapa</b> y pulsa <b>Geocodificar</b>.</div>
+          <div class="form-group" style="position:relative">
+            <label>Dirección <span style="font-size:12px;font-weight:400;color:var(--gray3)">— busca y selecciona de OpenStreetMap</span></label>
+            <div style="position:relative">
+              <input type="text" id="eDireccion" placeholder="Escribe calle, número y ciudad…"
+                     oninput="buscarDireccionAuto()" autocomplete="off"
+                     onblur="setTimeout(()=>{ const s=document.getElementById('eDireccionSugs'); if(s) s.style.display='none'; },200)">
+              <div id="eDireccionSugs" style="display:none;position:absolute;top:100%;left:0;right:0;background:white;border:1.5px solid var(--az);border-radius:0 0 8px 8px;box-shadow:var(--shadow-lg);z-index:50;max-height:260px;overflow-y:auto"></div>
+            </div>
+            <input type="hidden" id="eDireccionLat">
+            <input type="hidden" id="eDireccionLon">
+            <div id="eDireccionStatus" class="form-hint" style="margin-top:4px"></div>
           </div>
         </div>
       </div>
@@ -1700,6 +1714,61 @@ function autoGuardarEstancia() {
   });
 }
 
+// ── Autocompletado dirección empresa con Nominatim ──
+let _geoSugTimer = null;
+
+function buscarDireccionAuto() {
+  // Al escribir manualmente, invalidar coordenadas previas
+  document.getElementById('eDireccionLat').value = '';
+  document.getElementById('eDireccionLon').value = '';
+  document.getElementById('eDireccionStatus').textContent = '';
+
+  clearTimeout(_geoSugTimer);
+  const val = document.getElementById('eDireccion').value.trim();
+  const sug = document.getElementById('eDireccionSugs');
+  if (val.length < 4) { sug.style.display = 'none'; autoGuardarEmpresa(); return; }
+
+  sug.innerHTML = '<div style="padding:10px 12px;font-size:12px;color:var(--gray3)">Buscando…</div>';
+  sug.style.display = 'block';
+
+  _geoSugTimer = setTimeout(async () => {
+    try {
+      const r = await fetch('/api/geocode?' + new URLSearchParams({ q: val + ', España' }), { credentials: 'include' });
+      const data = await r.json();
+      if (!Array.isArray(data) || !data.length) {
+        sug.innerHTML = '<div style="padding:10px 12px;font-size:12px;color:var(--gray3)">Sin resultados. Prueba con más detalle.</div>';
+        return;
+      }
+      sug.innerHTML = data.slice(0, 6).map(item => {
+        const a = item.address || {};
+        const linea1 = [a.road, a.house_number].filter(Boolean).join(', ') || item.display_name.split(',')[0];
+        const linea2 = [a.postcode, a.city || a.town || a.village || a.municipality].filter(Boolean).join(', ');
+        const dirLimpia = [linea1, linea2].filter(Boolean).join(', ');
+        return `<div class="geo-sug-item" onmousedown="seleccionarDireccionOSM(${JSON.stringify(dirLimpia)}, ${item.lat}, ${item.lon})">
+          <div class="sug-main">${escHtml(linea1)}${linea2 ? '<span style="font-weight:400;color:var(--gray3)"> — '+escHtml(linea2)+'</span>' : ''}</div>
+          <div class="sug-sub">${escHtml(item.display_name)}</div>
+        </div>`;
+      }).join('');
+      sug.style.display = 'block';
+    } catch (e) {
+      sug.innerHTML = '<div style="padding:10px 12px;font-size:12px;color:var(--red)">Error al buscar. Comprueba la conexión.</div>';
+    }
+  }, 450);
+
+  autoGuardarEmpresa();
+}
+
+function seleccionarDireccionOSM(dirLimpia, lat, lon) {
+  document.getElementById('eDireccion').value = dirLimpia;
+  document.getElementById('eDireccionLat').value = lat;
+  document.getElementById('eDireccionLon').value = lon;
+  document.getElementById('eDireccionSugs').style.display = 'none';
+  document.getElementById('eDireccionStatus').innerHTML =
+    '✅ Dirección verificada en OpenStreetMap — coordenadas listas';
+  document.getElementById('eDireccionStatus').style.color = 'var(--green)';
+  autoGuardarEmpresa();
+}
+
 function autoGuardarEmpresa() {
   const id = parseInt(document.getElementById('empresaId').value);
   if (!id) return;
@@ -1707,6 +1776,8 @@ function autoGuardarEmpresa() {
     const nombre = document.getElementById('eNombre').value.trim();
     const cif    = document.getElementById('eCif').value.trim();
     if (!nombre || !cif) return;
+    const latVal = parseFloat(document.getElementById('eDireccionLat').value) || null;
+    const lonVal = parseFloat(document.getElementById('eDireccionLon').value) || null;
     const body = {
       nombre, cif,
       sector:          document.getElementById('eSector').value.trim(),
@@ -1717,8 +1788,9 @@ function autoGuardarEmpresa() {
       contacto_email:  document.getElementById('eContactoEmail').value.trim(),
       obs:             document.getElementById('eObs').value.trim(),
     };
+    if (latVal && lonVal) { body.lat = latVal; body.lon = lonVal; }
     const old = state.empresas.find(e => e.id === id);
-    if (old && body.direccion !== old.direccion) delete geocacheMap[old.cif];
+    if (old && body.direccion !== old.direccion) { delete geocacheMap[old.cif]; geocodificadoIntentado.delete(old.cif); }
     await Empresas.update(id, body);
     const e = state.empresas.find(x => x.id === id);
     if (e) Object.assign(e, {
@@ -1726,6 +1798,7 @@ function autoGuardarEmpresa() {
       direccion: body.direccion, contactoNombre: body.contacto_nombre,
       contactoCargo: body.contacto_cargo, contactoTel: body.contacto_tel,
       contactoEmail: body.contacto_email, obs: body.obs,
+      ...(latVal && lonVal ? { lat: latVal, lon: lonVal } : {}),
     });
   });
 }
@@ -2202,6 +2275,13 @@ function autocompletarEmpresa() {
 
 function abrirPanelEmpresa(id) {
   document.getElementById('panelEmpresaTitle').textContent = id === null ? 'Nueva empresa' : 'Editar empresa';
+  // Limpiar estado autocompletado
+  document.getElementById('eDireccionLat').value = '';
+  document.getElementById('eDireccionLon').value = '';
+  document.getElementById('eDireccionSugs').style.display = 'none';
+  const statusEl = document.getElementById('eDireccionStatus');
+  statusEl.textContent = ''; statusEl.style.color = '';
+
   if (id === null) {
     ['empresaId','eNombre','eCif','eSector','eDireccion','eContactoNombre','eContactoCargo','eContactoTel','eContactoEmail','eObs'].forEach(f => document.getElementById(f).value = '');
     _mostrarBtnGuardar('btnGuardarEmpresa', true);
@@ -2217,6 +2297,13 @@ function abrirPanelEmpresa(id) {
     document.getElementById('eContactoTel').value = e.contactoTel || '';
     document.getElementById('eContactoEmail').value = e.contactoEmail || '';
     document.getElementById('eObs').value = e.obs || '';
+    if (e.lat && e.lon) {
+      statusEl.innerHTML = '📍 Ya geolocalizda en el mapa';
+      statusEl.style.color = 'var(--green)';
+    } else if (e.direccion) {
+      statusEl.innerHTML = '⚠️ Sin coordenadas — busca la dirección abajo y selecciónala para geolocalizar';
+      statusEl.style.color = '#8B6000';
+    }
     _mostrarBtnGuardar('btnGuardarEmpresa', false);
   }
   document.getElementById('overlayEmpresa')?.classList.add('open');
@@ -2876,6 +2963,8 @@ async function guardarEmpresa() {
   const nombre=document.getElementById('eNombre').value.trim();
   const cif=document.getElementById('eCif').value.trim();
   if(!nombre||!cif){toast('Nombre y CIF son obligatorios','error');return;}
+  const latVal = parseFloat(document.getElementById('eDireccionLat').value) || null;
+  const lonVal = parseFloat(document.getElementById('eDireccionLon').value) || null;
   const body={nombre,cif,
     sector:document.getElementById('eSector').value.trim(),
     direccion:document.getElementById('eDireccion').value.trim(),
@@ -2884,6 +2973,7 @@ async function guardarEmpresa() {
     contacto_tel:document.getElementById('eContactoTel').value.trim(),
     contacto_email:document.getElementById('eContactoEmail').value.trim(),
     obs:document.getElementById('eObs').value.trim()};
+  if (latVal && lonVal) { body.lat = latVal; body.lon = lonVal; }
   const idEl=document.getElementById('empresaId').value;
   try {
     setSaveIndicator('pending');
@@ -2893,7 +2983,7 @@ async function guardarEmpresa() {
     } else {
       const uid=parseInt(idEl);
       const old=state.empresas.find(e=>e.id===uid);
-      if(old&&body.direccion!==old.direccion) delete geocacheMap[old.cif];
+      if(old&&body.direccion!==old.direccion){ delete geocacheMap[old.cif]; geocodificadoIntentado.delete(old.cif); }
       await Empresas.update(uid,body); addHistorial('edit','Modificada empresa: '+nombre);
       toast('Empresa actualizada','success');
     }
