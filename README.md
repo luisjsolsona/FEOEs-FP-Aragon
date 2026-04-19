@@ -1,85 +1,134 @@
-# FEOE FP Aragón — Versión Docker
+# FEOEs FP Aragón
 
-Aplicación de gestión de **Formación en Empresa u Organismo Equiparado** para centros de FP en Aragón.
+Aplicación web para la gestión de las **Formación en Empresa u Organismo Equiparado (FEOE)** en centros de Formación Profesional de Aragón. Permite hacer seguimiento completo de alumnos, empresas colaboradoras, tutores y estancias formativas.
 
-## Arquitectura
+---
 
-```
-┌─────────────────────────────────────┐
-│  Navegador (puerto 5000)            │
-└────────────────┬────────────────────┘
-                 │
-┌────────────────▼────────────────────┐
-│  Nginx (feoe_frontend)              │
-│  · Sirve index.html y api.js        │
-│  · Proxy /api/* → backend           │
-└────────────────┬────────────────────┘
-                 │
-┌────────────────▼────────────────────┐
-│  Express + SQLite (feoe_backend)    │
-│  · API REST JWT                     │
-│  · BD: ./data/feoe.sqlite           │
-└─────────────────────────────────────┘
-```
+## Características generales
+
+- Aplicación web accesible desde cualquier navegador, sin instalación en el equipo del usuario
+- Arquitectura cliente-servidor: frontend Nginx + backend Express + base de datos SQLite
+- Autenticación segura mediante JWT
+- Registro de auditoría (historial de todas las acciones)
+- Sistema de solicitudes con aprobación por parte del administrador
+- Compatible con Docker en cualquier plataforma (Linux, Windows, macOS, CasaOS)
+
+---
+
+## Características particulares
+
+- Gestión completa de **alumnos**: datos personales, ciclo formativo, tutor asignado
+- Gestión de **empresas** colaboradoras: datos de contacto, CIF, historial de estancias
+- Gestión de **estancias**: fechas, empresa, tutor de empresa, valoraciones
+- **Mapa interactivo** de empresas colaboradoras
+- Exportación de datos a **Excel**
+- **Solicitudes de eliminación**: los profesores solicitan, el admin aprueba o rechaza
+- Historial de auditoría completo con todas las operaciones realizadas
+
+---
 
 ## Instalación y arranque
+
+**Requisitos:** Docker + Docker Compose
 
 ```bash
 # 1. Clonar el repositorio
 git clone https://github.com/luisjsolsona/FEOEs-FP-Aragon.git
 cd FEOEs-FP-Aragon
 
-# 2. Crear el fichero de configuración a partir de la plantilla
+# 2. Crear el fichero de configuración
 cp .env.example .env
 # Edita .env y cambia JWT_SECRET y ADMIN_PASSWORD por valores propios
 
-# 3. Arrancar los contenedores
-docker-compose up -d
-
-# 4. Abrir en el navegador
-http://localhost:5000
+# 3. Construir y arrancar
+docker compose up -d --build
 ```
 
-Login por defecto: `admin` / `admin1234`
+Acceder en: **http://localhost:5000**
 
-> ⚠️ Cambia la contraseña tras el primer inicio de sesión (`Usuarios → ··· → Cambiar contraseña`).
-
-## Comandos útiles
+La base de datos se crea automáticamente en `./data/feoe.sqlite` en el primer arranque.
 
 ```bash
-docker-compose logs -f          # Ver logs en tiempo real
-docker-compose down             # Parar
-docker-compose up -d --build    # Reconstruir imágenes
+# Arranques posteriores
+docker compose up -d
+
+# Ver logs
+docker compose logs -f
+
+# Parar
+docker compose down
+
+# Actualizar tras git pull
+docker compose up -d --build
 ```
 
-## Datos persistentes
+---
 
-La base de datos SQLite se guarda en `./data/feoe.sqlite`.  
-Haz copia de esta carpeta para tener backups.
+## Credenciales por defecto
 
-## Roles
+| Usuario | Contraseña  |
+|---------|-------------|
+| `admin` | `admin1234` |
 
-| Rol        | Puede hacer                                                        |
-|------------|--------------------------------------------------------------------|
-| **Admin**  | Todo: crear/editar/eliminar alumnos, empresas, aprobar solicitudes, gestionar usuarios |
-| **Profesor**| Crear/editar alumnos y estancias; solicitar eliminaciones (requieren aprobación admin) |
+> ⚠️ Cambia la contraseña tras el primer inicio de sesión en `Usuarios → ··· → Cambiar contraseña`.
 
-## API REST
+Edita `.env` para establecer credenciales propias antes del primer arranque:
 
-| Método | Ruta                         | Descripción                    |
-|--------|------------------------------|--------------------------------|
-| POST   | /api/auth/login              | Iniciar sesión                 |
-| POST   | /api/auth/logout             | Cerrar sesión                  |
-| GET    | /api/auth/me                 | Usuario actual                 |
-| GET    | /api/alumnado                | Listar alumnos con estancias   |
-| POST   | /api/alumnado                | Crear/actualizar alumno (DNI)  |
-| POST   | /api/alumnado/bulk-delete    | Eliminar varios (admin)        |
-| GET    | /api/empresas                | Listar empresas                |
-| POST   | /api/empresas                | Crear/actualizar empresa (CIF) |
-| POST   | /api/estancias               | Crear/actualizar estancia      |
-| GET    | /api/pendientes              | Listar solicitudes             |
-| POST   | /api/pendientes              | Solicitar eliminación          |
-| PUT    | /api/pendientes/:id/resolver | Aprobar/rechazar (admin)       |
-| GET    | /api/historial               | Registro de auditoría          |
-| GET    | /api/users                   | Listar usuarios (admin)        |
-| POST   | /api/users                   | Crear usuario (admin)          |
+```env
+JWT_SECRET=cadena_larga_y_aleatoria
+ADMIN_PASSWORD=contraseña_segura
+```
+
+---
+
+## Roles / Permisos
+
+| Acción | Admin | Profesor |
+|--------|:-----:|:--------:|
+| Ver alumnos y estancias | ✅ | ✅ |
+| Crear / editar alumnos y estancias | ✅ | ✅ |
+| Eliminar alumnos o estancias | ✅ | 🔄 requiere aprobación |
+| Gestionar empresas | ✅ | ✅ |
+| Aprobar / rechazar solicitudes | ✅ | ❌ |
+| Ver historial de auditoría | ✅ | ❌ |
+| Gestionar usuarios | ✅ | ❌ |
+
+---
+
+## Arquitectura
+
+```
+FEOEs-FP-Aragon/
+├── docker-compose.yml          # Orquestación: backend + frontend (Nginx)
+├── .env.example                # Plantilla de variables de entorno
+├── backend/
+│   ├── Dockerfile
+│   ├── server.js               # API REST Express.js
+│   └── routes/                 # Rutas: auth, alumnado, empresas, estancias, usuarios
+├── frontend/
+│   ├── Dockerfile
+│   ├── nginx.conf              # Proxy /api/* → backend
+│   ├── icon.svg                # Icono de la aplicación
+│   ├── api.js                  # Cliente API compartido
+│   └── index.html              # SPA completa en un único fichero
+└── data/
+    └── feoe.sqlite             # Base de datos (generada al arrancar, persistente)
+```
+
+**Stack:** Node.js · Express · SQLite · Nginx · Docker
+
+---
+
+## Despliegue en CasaOS
+
+1. Clona el repositorio en tu servidor CasaOS:
+   ```bash
+   git clone https://github.com/luisjsolsona/FEOEs-FP-Aragon.git
+   ```
+2. Crea el fichero `.env` a partir de `.env.example` y edita las credenciales
+3. En la UI de CasaOS ve a **App Store → Custom Install → Import docker-compose**
+4. Selecciona el fichero `docker-compose.yml` del repositorio clonado
+5. CasaOS detectará automáticamente el nombre, descripción e icono de la app
+6. Accede en `http://<ip-casaos>:5000`
+
+> ⚠️ Edita `.env` con tu propio `JWT_SECRET` y `ADMIN_PASSWORD` antes de arrancar en producción.
