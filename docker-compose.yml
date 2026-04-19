@@ -43,3 +43,23 @@ services:
       - "5000:80"
     depends_on:
       - backend
+
+x-casaos:
+  main: frontend
+  title:
+    en_us: FEOEs FP Aragón
+  tagline:
+    en_us: Gestión de Formación en Empresa para FP Aragón
+  description:
+    en_us: >
+      Aplicación web para gestionar las FEOEs (Formación en Empresa u
+      Organismo Equiparado) de Formación Profesional en Aragón.
+      Seguimiento de alumnos, empresas y tutores.
+  icon: https://raw.githubusercontent.com/luisjsolsona/FEOEs-FP-Aragon/main/frontend/icon.svg
+  architectures:
+    - amd64
+    - arm64
+  category: utilities
+  port_map: "5000"
+  scheme: http
+  index: /
