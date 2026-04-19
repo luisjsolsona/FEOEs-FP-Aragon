@@ -3557,15 +3557,21 @@ async function geocodificarDireccion(dir) {
 
   // Normalizar abreviaturas españolas comunes
   const norm = s => s
-    .replace(/\bC\/\s*/gi,       'Calle ')
-    .replace(/\bC\.\s*/gi,       'Calle ')
-    .replace(/\bAv(da)?\.?\s*/gi,'Avenida ')
-    .replace(/\bPza?\.?\s*/gi,   'Plaza ')
-    .replace(/\bPg?\.?\s*/gi,    'Pasaje ')
-    .replace(/\bPol\.?\s*/gi,    'Polígono ')
-    .replace(/\bUrb\.?\s*/gi,    'Urbanización ')
-    .replace(/\bCtra?\.?\s*/gi,  'Carretera ')
+    .replace(/\([^)]*\)/g,        '')        // quitar texto entre paréntesis
+    .replace(/\bC\/\s*/gi,        'Calle ')
+    .replace(/\bC\.\s+(?=\w)/gi,  'Calle ')  // "C. de" pero no "C.P."
+    .replace(/\bAv(da)?\.?\s*/gi, 'Avenida ')
+    .replace(/\bPza?\.?\s*/gi,    'Plaza ')
+    .replace(/\bPas(eo)?\.?\s*/gi,'Paseo ')
+    .replace(/\bP\.º\s*/gi,       'Paseo ')
+    .replace(/\bPg?\.?\s*/gi,     'Pasaje ')
+    .replace(/\bPol\.?\s*/gi,     'Polígono ')
+    .replace(/\bUrb\.?\s*/gi,     'Urbanización ')
+    .replace(/\bCtra?\.?\s*/gi,   'Carretera ')
+    .replace(/\bCr\b\.?\s*/gi,    'Carretera ')
+    .replace(/,\s*España\s*$/gi,  '')         // quitar ", España" al final
     .replace(/—/g, ',')
+    .replace(/\s{2,}/g, ' ')
     .trim();
 
   const dirN   = norm(dir);
