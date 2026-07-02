@@ -1215,7 +1215,7 @@ window.addEventListener('unhandledrejection', function(e) {
       <input type="hidden" id="alumnoId">
 
       <!-- DATOS PERSONALES -->
-      <div class="form-section">
+      <div class="form-section" id="seccionDatosPersonales">
         <div class="form-section-title">📋 Datos personales</div>
         <div class="form-row col2">
           <div class="form-group">
@@ -2090,10 +2090,29 @@ function actualizarContadores() {
 // ══════════════════════════════════════════
 //  PANEL ALUMNO — datos personales + estancias
 // ══════════════════════════════════════════
-function abrirPanelAlumno(id) {
+function abrirPanelAlumno(id, modo) {
+  // modo: 'datos' | 'estancias' (omitido = nuevo alumno → siempre 'datos')
   const isNew = id === null;
-  document.getElementById('panelAlumnoTitle').textContent = isNew ? 'Nuevo alumno' : 'Editar alumno';
-  document.getElementById('panelAlumnoSub').textContent   = isNew ? 'Datos personales del alumno/a' : `Alumno #${String(id).padStart(3,'0')} — datos y estancias FEOE`;
+  const modoEfectivo = isNew ? 'datos' : (modo || 'datos');
+
+  const secDatos     = document.getElementById('seccionDatosPersonales');
+  const secEstancias = document.getElementById('seccionEstancias');
+  const btnGuardar   = document.getElementById('btnGuardarAlumno');
+
+  if (modoEfectivo === 'datos') {
+    document.getElementById('panelAlumnoTitle').textContent = isNew ? 'Nuevo alumno' : '📋 Datos personales';
+    document.getElementById('panelAlumnoSub').textContent   = isNew ? 'Rellena los datos del alumno/a' : 'Editar nombre, DNI y familia profesional';
+    secDatos.style.display     = 'block';
+    secEstancias.style.display = 'none';
+    if (btnGuardar) btnGuardar.style.display = '';
+  } else {
+    document.getElementById('panelAlumnoTitle').textContent = '🏢 Estancias FEOE';
+    document.getElementById('panelAlumnoSub').textContent   = `Alumno #${String(id).padStart(3,'0')} — estancias y seguimientos`;
+    secDatos.style.display     = 'none';
+    secEstancias.style.display = 'block';
+    if (btnGuardar) btnGuardar.style.display = 'none';
+  }
+
   const empSel = document.getElementById('aEmpresa');
   if (empSel) {
     empSel.innerHTML = '<option value="" style="background:white;color:var(--gray3)">— Seleccionar empresa registrada —</option>'
@@ -2106,7 +2125,6 @@ function abrirPanelAlumno(id) {
     document.getElementById('alumnoId').value = '';
     ['aApellidos','aNombre','aDni'].forEach(f=>document.getElementById(f).value='');
     document.getElementById('aFamilia').value = '';
-    document.getElementById('seccionEstancias').style.display = 'none';
     mostrarFormEstancia(null);
     _mostrarBtnGuardar('btnGuardarAlumno', true);
   } else {
@@ -2116,22 +2134,17 @@ function abrirPanelAlumno(id) {
     document.getElementById('aNombre').value    = a.nombre;
     document.getElementById('aDni').value       = a.dni;
     document.getElementById('aFamilia').value   = a.familia || '';
-    document.getElementById('seccionEstancias').style.display = 'block';
     renderListaEstancias(a.id);
     mostrarFormEstancia(null);
-    _mostrarBtnGuardar('btnGuardarAlumno', false);
+    if (modoEfectivo === 'datos') _mostrarBtnGuardar('btnGuardarAlumno', false);
   }
+  document.getElementById('panelAlumno').scrollTop = 0;
   document.getElementById('overlayAlumno')?.classList.add('open');
 }
 
 function abrirPanelAlumnoEstancias(id) {
   if (id === null) { abrirPanelAlumno(null); return; }
-  abrirPanelAlumno(id);
-  setTimeout(() => {
-    const panel = document.getElementById('panelAlumno');
-    const seccion = document.getElementById('seccionEstancias');
-    if (panel && seccion) panel.scrollTo({ top: seccion.offsetTop - 16, behavior: 'smooth' });
-  }, 60);
+  abrirPanelAlumno(id, 'estancias');
 }
 
 function renderListaEstancias(alumnoId) {
