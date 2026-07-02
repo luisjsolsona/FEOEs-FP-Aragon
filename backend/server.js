@@ -50,6 +50,7 @@ app.use('/api/seguimientos', require('./routes/seguimientos'));
 app.use('/api/pendientes',   require('./routes/pendientes'));
 app.use('/api/historial',    require('./routes/historial'));
 app.use('/api/geocode',      require('./routes/geocode'));
+app.use('/api/admin',        require('./routes/admin'));
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', ts: new Date().toISOString() }));
 

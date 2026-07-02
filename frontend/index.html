@@ -832,6 +832,14 @@ window.addEventListener('unhandledrejection', function(e) {
           <span style="width:20px;text-align:center">🏢</span> Exportar empresas a Excel (.xlsx)
         </button>
 
+        <div style="height:1px;background:var(--gray6);margin:4px 0"></div>
+
+        <!-- Zona peligrosa -->
+        <div style="padding:7px 14px 4px;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--red)">Zona peligrosa</div>
+        <button class="menu-item" style="color:var(--red)" onclick="borrarTodosLosDatos()">
+          <span style="width:20px;text-align:center">🗑️</span> Borrar todos los datos
+        </button>
+
         <div id="storageInfo" style="padding:7px 14px;font-size:11px;color:var(--gray4);border-top:1px solid var(--gray6);margin-top:4px">BD SQLite · servidor</div>
       </div>
     </div>
@@ -2926,6 +2934,30 @@ function exportarEmpresasExcel() {
   XLSX.writeFile(wb,'FEOE_empresas_'+new Date().toISOString().slice(0,10)+'.xlsx');
   toast('Excel exportado: '+filtradas.length+' empresas','success');
 }
+async function borrarTodosLosDatos() {
+  cerrarMenuDatos();
+  confirmar(
+    '⚠️ Borrar todos los datos',
+    'Esta acción eliminará TODOS los alumnos, empresas, estancias y visitas de la base de datos.\n\nEsta operación NO se puede deshacer.\n\n¿Estás seguro de que quieres continuar?',
+    () => {
+      confirmar(
+        '🗑️ Confirmación final',
+        'Segunda y última confirmación.\n\nSe borrarán permanentemente todos los datos del sistema. La base de datos quedará completamente vacía.\n\n¿Confirmas el borrado total?',
+        async () => {
+          try {
+            await window.apiFetch('/admin/reset', { method: 'DELETE' });
+            await cargarDatos();
+            addHistorial('edit', 'Borrado total de datos realizado por ' + (currentUser?.username || 'admin'));
+            toast('Todos los datos han sido eliminados', 'success');
+          } catch(e) {
+            toast('Error al borrar datos: ' + e.message, 'error');
+          }
+        }
+      );
+    }
+  );
+}
+
 function exportarJSON() {
   cerrarMenuDatos();
   descargarBlob(new Blob([JSON.stringify({alumnado:state.alumnado,empresas:state.empresas,_savedAt:new Date().toISOString()},null,2)],{type:'application/json'}),'FEOE_backup_'+new Date().toISOString().slice(0,10)+'.json');
