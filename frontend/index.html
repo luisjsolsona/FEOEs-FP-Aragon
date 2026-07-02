@@ -2227,11 +2227,12 @@ function renderListaEstancias(alumnoId) {
 
         // Acciones
         + (canWrite()
-            ? '<div style="display:flex;gap:6px">'
+            ? '<div style="display:flex;gap:6px;flex-wrap:wrap">'
               + '<button class="btn btn-sm btn-secondary" onclick="mostrarFormEstancia('+e.id+')">'
                 + '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>'
                 + ' Editar estancia'
               + '</button>'
+              + '<button class="btn btn-sm btn-secondary" onclick="nuevaVisitaRapida('+e.id+')">+ Nueva visita</button>'
               + (!e.deletePending
                   ? '<button class="btn btn-sm btn-ghost" style="color:var(--red)" onclick="solicitarEliminarEstancia('+e.id+')">🗑 Borrar</button>'
                   : '<span class="badge badge-pend">⏳ Pendiente borrado</span>')
@@ -2317,6 +2318,14 @@ function cancelarFormEstancia() {
   _currentEstanciaId = null; _seguimientosCache = [];
   const sl = document.getElementById('seguimientosList'); if(sl) sl.innerHTML = '';
   const sf = document.getElementById('formSeguimiento'); if(sf) sf.style.display = 'none';
+}
+
+async function nuevaVisitaRapida(estanciaId) {
+  mostrarFormEstancia(estanciaId);
+  await cargarSeguimientos(estanciaId);
+  abrirFormSeguimiento(null);
+  const fe = document.getElementById('formEstancia');
+  if (fe) fe.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 function autocompletarEmpresa() {
