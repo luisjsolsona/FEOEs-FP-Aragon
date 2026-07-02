@@ -2349,7 +2349,7 @@ function renderEmpresas() {
 
   container.innerHTML = empresas.map(e => {
     // Agrupar estancias de esta empresa por curso
-    const ests = state.estancias.filter(s => !s.deleted && s.empresaId === e.id);
+    const ests = state.estancias.filter(s => !s.deleted && (s.empresaId === e.id || (!s.empresaId && s.empresaCif && s.empresaCif === e.cif)));
     const byYear = {};
     ests.forEach(s => {
       const a = state.alumnado.find(x=>x.id===s.alumnoId && !x.deleted);
@@ -2840,16 +2840,18 @@ async function restaurarBackupJSON(evt) {
         'El fichero contiene ' + d.alumnado.length + ' alumnos y ' + d.empresas.length + ' empresas.\n\nSe importaran los registros que no existan (por DNI/CIF). No se sobreescribiran los existentes.\n\n¿Continuar?',
         async () => {
           let al=0, emp=0, err=0;
-          // Import empresas first
+          // Import empresas first — guardar mapa CIF→id para enlazar estancias
+          const cifToId = {};
           for (const e of (d.empresas||[])) {
             if (!e.nombre || !e.cif) continue;
             try {
-              await Empresas.create({
+              const res = await Empresas.create({
                 nombre:e.nombre, cif:e.cif, sector:e.sector||'',
                 direccion:e.direccion||'', contacto_nombre:e.contactoNombre||'',
                 contacto_cargo:e.contactoCargo||'', contacto_tel:e.contactoTel||'',
                 contacto_email:e.contactoEmail||'', obs:e.obs||''
               });
+              cifToId[e.cif.toUpperCase()] = res.empresa?.id || null;
               emp++;
             } catch { err++; }
           }
@@ -2865,12 +2867,15 @@ async function restaurarBackupJSON(evt) {
               for (const est of (a.estancias||[])) {
                 if (!est.curso) continue;
                 try {
+                  const empCif = (est.empresaCif||'').toUpperCase();
                   await Estancias.create({
                     alumno_id: alumno.id, curso: est.curso,
-                    nivel: est.nivel||'', empresa_nombre: est.empresaNombre||'',
-                    empresa_cif: est.empresaCif||'', periodo_ini: est.periodoIni||'',
+                    nivel: est.nivel||'', empresa_id: cifToId[empCif]||null,
+                    empresa_nombre: est.empresaNombre||'',
+                    empresa_cif: empCif, periodo_ini: est.periodoIni||'',
                     periodo_fin: est.periodoFin||'', contacto: est.contacto||'',
-                    obs_empresa: est.obsEmpresa||'', obs_alumno: est.obsAlumno||''
+                    obs_empresa: est.obsEmpresa||'', obs_alumno: est.obsAlumno||'',
+                    calificacion: est.calificacion||''
                   });
                 } catch {}
               }
@@ -2914,7 +2919,7 @@ function exportarEmpresasExcel() {
   const filtradas=q?data.filter(e=>(e.nombre+' '+e.cif).toLowerCase().includes(q)):data;
   const rows=[['ID','Nombre','CIF','Sector','Direccion','Contacto','Cargo','Telefono','Email','Obs','N Estancias'],
     ...filtradas.map(e=>[e.id,e.nombre,e.cif,e.sector,e.direccion,e.contactoNombre,e.contactoCargo,e.contactoTel,e.contactoEmail,e.obs,
-      state.estancias.filter(s=>!s.deleted&&s.empresaId===e.id).length])];
+      state.estancias.filter(s=>!s.deleted&&(s.empresaId===e.id||(!s.empresaId&&s.empresaCif===e.cif))).length])];
   const wb=XLSX.utils.book_new(),ws=XLSX.utils.aoa_to_sheet(rows);
   ws['!cols']=[4,30,12,20,35,20,20,14,30,40,8].map(w=>({wch:w}));
   XLSX.utils.book_append_sheet(wb,ws,'Empresas_FEOE');
@@ -3816,7 +3821,7 @@ function renderMapaMarkers() {
     listaEl.innerHTML = todasEmpresas.map(emp => {
       const tieneDir = emp.direccion && emp.direccion.trim();
       const tieneCoords = emp.lat && emp.lon;
-      const nAct = state.estancias.filter(e => !e.deleted && e.empresaId === emp.id && e.curso === cursoRef).length;
+      const nAct = state.estancias.filter(e => !e.deleted && (e.empresaId === emp.id || (!e.empresaId && e.empresaCif === emp.cif)) && e.curso === cursoRef).length;
       let estadoIcon, estadoTxt, estadoColor;
       if (tieneCoords) {
         estadoIcon = '📍'; estadoTxt = 'En el mapa'; estadoColor = 'var(--green)';
@@ -3848,8 +3853,9 @@ function renderMapaMarkers() {
     if (q && !`${emp.nombre} ${emp.cif} ${emp.sector} ${emp.contactoNombre}`.toLowerCase().includes(q)) return;
 
     // estancias → join with alumnado for display
-    const estAct  = state.estancias.filter(e=>!e.deleted && e.empresaId===emp.id && e.curso===cursoRef);
-    const estHist = state.estancias.filter(e=>!e.deleted && e.empresaId===emp.id && e.curso!==cursoRef);
+    const matchEmp = e => !e.deleted && (e.empresaId===emp.id || (!e.empresaId && e.empresaCif===emp.cif));
+    const estAct  = state.estancias.filter(e => matchEmp(e) && e.curso===cursoRef);
+    const estHist = state.estancias.filter(e => matchEmp(e) && e.curso!==cursoRef);
     const alumnosActuales  = estAct.map(e=>{const a=state.alumnado.find(x=>x.id===e.alumnoId)||{}; return {...e,apellidos:a.apellidos||'?',nombre:a.nombre||''};});
     const alumnosHistorico = estHist.map(e=>{const a=state.alumnado.find(x=>x.id===e.alumnoId)||{}; return {...e,apellidos:a.apellidos||'?',nombre:a.nombre||''};});
     const tieneActuales = alumnosActuales.length > 0;
