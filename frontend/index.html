@@ -2410,7 +2410,7 @@ function renderEmpresas() {
                 <td class="mono" style="color:var(--gray3)">${a.dni}</td>
                 <td style="color:var(--gray3)">${a.periodoIni ? formatFecha(a.periodoIni)+' → '+formatFecha(a.periodoFin) : '—'}</td>
                 <td><span style="display:inline-flex;align-items:center;gap:4px;background:${vBg};color:${vColor};border-radius:4px;padding:2px 8px;font-size:12px;font-weight:700">${vIcon} ${a.nVisitas} visita${a.nVisitas!==1?'s':''}${a.nPend>0?' · <span style="font-weight:400;font-size:11px">'+a.nPend+' pend.</span>':''}</span></td>
-                <td><button class="btn btn-sm btn-ghost" onclick="abrirPanelAlumno(${a.alumnoId})">✏️</button></td>
+                <td><button class="btn btn-sm btn-secondary" onclick="abrirPanelAlumno(${a.alumnoId})">✏️ Editar</button></td>
               </tr>`;
             }).join('')}
           </table>
