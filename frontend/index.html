@@ -722,7 +722,7 @@ window.addEventListener('unhandledrejection', function(e) {
     .hide-mobile { display: none !important; }
     th, td { font-size: 12px; }
     .toolbar .filter-select { min-width: 110px; }
-    .panel { width: 420px; }
+    .panel { width: 90vw; }
     .stat-card { min-width: 120px; }
   }
 
@@ -1111,7 +1111,7 @@ window.addEventListener('unhandledrejection', function(e) {
 
 </main><!-- ── PANEL USUARIO ── -->
 <div class="overlay" id="overlayUsuario" onclick="cerrarPaneles(event)">
-  <div class="panel" style="width:520px">
+  <div class="panel">
     <div class="panel-header">
       <div>
         <h2 id="panelUsuarioTitle">Nuevo usuario</h2>
@@ -1203,7 +1203,7 @@ window.addEventListener('unhandledrejection', function(e) {
 
 <!-- ── PANEL ALUMNO ── -->
 <div class="overlay" id="overlayAlumno" onclick="cerrarPaneles(event)">
-  <div class="panel" id="panelAlumno" style="width:860px">
+  <div class="panel" id="panelAlumno">
     <div class="panel-header">
       <div>
         <h2 id="panelAlumnoTitle">Nuevo alumno</h2>
@@ -1557,7 +1557,7 @@ window.addEventListener('unhandledrejection', function(e) {
 
 <!-- ── MODAL IMPORTACIÓN ── -->
 <div id="modalImport" onclick="if(event.target===this)cerrarImport()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:280;align-items:center;justify-content:center;backdrop-filter:blur(3px)">
-  <div style="background:white;border-radius:10px;width:700px;max-width:95%;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,0.3);animation:popIn 0.18s ease">
+  <div style="background:white;border-radius:10px;width:90vw;max-width:96%;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,0.3);animation:popIn 0.18s ease">
     <!-- Header -->
     <div style="padding:20px 24px 16px;border-bottom:var(--border);background:var(--az);color:white;border-radius:10px 10px 0 0;display:flex;justify-content:space-between;align-items:flex-start">
       <div>
