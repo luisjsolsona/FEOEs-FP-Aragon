@@ -937,7 +937,7 @@ window.addEventListener('unhandledrejection', function(e) {
             <th onclick="sortBy('empresa')">Empresa</th>
             <th class="hide-mobile">Periodo</th>
             <th class="hide-mobile" title="Observaciones del alumno en la última estancia">Obs.</th>
-            <th style="width:110px" title="✏️ Ver/editar · 🗑 Eliminar">Acciones</th>
+            <th style="min-width:200px">Acciones</th>
           </tr>
         </thead>
         <tbody id="tablaBody"></tbody>
@@ -1960,8 +1960,8 @@ function renderTabla() {
     const u=f.ultima, n=f.estancias.length;
     const sel = seleccion.has(f.id);
     return `
-    <tr class="${sel?'selected-row':''}">
-      <td style="padding:8px 8px 8px 14px;width:32px">${canValidate()?`<input type="checkbox" class="cb-row" data-id="${f.id}" ${sel?'checked':''} onclick="toggleSelRow(${f.id},this)">`:'&nbsp;'}</td>
+    <tr class="${sel?'selected-row':''}" style="cursor:pointer" onclick="abrirPanelAlumnoEstancias(${f.id})">
+      <td style="padding:8px 8px 8px 14px;width:32px" onclick="event.stopPropagation()">${canValidate()?`<input type="checkbox" class="cb-row" data-id="${f.id}" ${sel?'checked':''} onclick="toggleSelRow(${f.id},this)">`:'&nbsp;'}</td>
       <td class="mono" style="color:var(--gray4);width:40px">${String(f.id).padStart(3,'0')}</td>
       <td style="min-width:160px">
         <div class="cell-name">${f.apellidos}, ${f.nombre}</div>
@@ -1985,9 +1985,10 @@ function renderTabla() {
       <td class="hide-mobile" style="font-size:12px;color:var(--gray3);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(u?.obsAlumno||'')}">
         ${u?.obsAlumno?'📝 '+u.obsAlumno:'—'}
       </td>
-      <td style="min-width:110px">
-        <div style="display:flex;gap:4px;align-items:center">
-          <button class="btn btn-sm btn-secondary" title="Ver/editar alumno y sus estancias FEOE" onclick="abrirPanelAlumno(${f.id})">✏️ Editar</button>
+      <td style="min-width:200px" onclick="event.stopPropagation()">
+        <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
+          <button class="btn btn-sm btn-ghost" title="Editar datos personales del alumno" onclick="abrirPanelAlumno(${f.id})">✏️ Datos personales</button>
+          <button class="btn btn-sm btn-secondary" title="Ver y gestionar estancias FEOE" onclick="abrirPanelAlumnoEstancias(${f.id})">📋 Estancias FEOE</button>
           ${isAdmin()?`<button class="btn btn-sm btn-danger" title="Solicitar eliminación de este alumno y todas sus estancias" onclick="solicitarEliminar('alumno',${f.id},'${esc(f.apellidos+' '+f.nombre)}')">🗑</button>`:''}
         </div>
       </td>
@@ -2121,6 +2122,16 @@ function abrirPanelAlumno(id) {
     _mostrarBtnGuardar('btnGuardarAlumno', false);
   }
   document.getElementById('overlayAlumno')?.classList.add('open');
+}
+
+function abrirPanelAlumnoEstancias(id) {
+  if (id === null) { abrirPanelAlumno(null); return; }
+  abrirPanelAlumno(id);
+  setTimeout(() => {
+    const panel = document.getElementById('panelAlumno');
+    const seccion = document.getElementById('seccionEstancias');
+    if (panel && seccion) panel.scrollTo({ top: seccion.offsetTop - 16, behavior: 'smooth' });
+  }, 60);
 }
 
 function renderListaEstancias(alumnoId) {
