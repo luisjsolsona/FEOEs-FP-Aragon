@@ -138,3 +138,14 @@ FEOEs-FP-Aragon/
 6. Accede en `http://<ip-casaos>:5000`
 
 > ⚠️ Edita `.env` con tu propio `JWT_SECRET` y `ADMIN_PASSWORD` antes de arrancar en producción.
+
+### Cargar el listado de prospección en la base de datos
+
+```bash
+node backend/seed_prospeccion.js
+```
+
+Inserta las empresas de `docs/prospeccion/prospeccion_empresas_IFC_zaragoza.csv` en la
+tabla `empresas` (idempotente: omite las que ya existan por nombre). El CIF real no
+se conoce todavía, así que se usa un CIF-placeholder `PROSP-NNN` que hay que sustituir
+al validar cada convenio.
