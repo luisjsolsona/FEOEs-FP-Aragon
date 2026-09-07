@@ -349,9 +349,9 @@ window.addEventListener('unhandledrejection', function(e) {
   .overlay.open { display: flex; }
   .panel {
     background: var(--white);
-    width: 90vw;
-    max-width: 96%;
-    max-height: 92vh;
+    width: 94vw;
+    max-width: 1180px;
+    max-height: 95vh;
     overflow-y: auto;
     box-shadow: 0 20px 60px rgba(26,39,68,0.35);
     display: flex; flex-direction: column;
@@ -1202,14 +1202,17 @@ window.addEventListener('unhandledrejection', function(e) {
 </div>
 
 <!-- ── PANEL ALUMNO ── -->
-<div class="overlay" id="overlayAlumno" onclick="cerrarPaneles(event)">
+<div class="overlay" id="overlayAlumno" onclick="if(event.target===this)cerrarPanelAlumnoConGuardado()">
   <div class="panel" id="panelAlumno">
     <div class="panel-header">
       <div>
         <h2 id="panelAlumnoTitle">Nuevo alumno</h2>
         <small id="panelAlumnoSub">Rellena los datos del alumno/a</small>
       </div>
-      <button class="close-btn" onclick="cerrarPanel('overlayAlumno')">✕</button>
+      <div style="display:flex;align-items:center;gap:12px">
+        <div id="panelAlumnoSaveIndicator" style="font-size:11px;opacity:0.85;display:flex;align-items:center;gap:5px;white-space:nowrap"></div>
+        <button class="close-btn" onclick="cerrarPanelAlumnoConGuardado()">✕</button>
+      </div>
     </div>
     <div class="panel-body" style="padding:20px 24px">
       <input type="hidden" id="alumnoId">
@@ -1234,7 +1237,7 @@ window.addEventListener('unhandledrejection', function(e) {
           </div>
           <div class="form-group">
             <label>Familia Profesional</label>
-            <select id="aFamilia" onchange="autoGuardarAlumno()">
+            <select id="aFamilia" onchange="cambioFamilia()">
               <option value="">Selecciona…</option>
               <option>INFORMÁTICA Y COMUNICACIONES</option>
               <option>ADMINISTRACIÓN Y GESTIÓN</option>
@@ -1253,6 +1256,12 @@ window.addEventListener('unhandledrejection', function(e) {
               <option>QUÍMICA</option>
               <option>OTRA</option>
             </select>
+          </div>
+        </div>
+        <div class="form-row" style="margin-top:10px">
+          <div class="form-group">
+            <label>Observaciones personales del alumno/a</label>
+            <textarea id="aObsPersonal" placeholder="Notas personales, circunstancias a tener en cuenta…" style="min-height:80px" oninput="autoGuardarAlumno()"></textarea>
           </div>
         </div>
       </div>
@@ -1289,18 +1298,11 @@ window.addEventListener('unhandledrejection', function(e) {
         <div class="form-row col2" style="margin-bottom:10px">
           <div class="form-group">
             <label>Curso académico *</label>
-            <select id="aCurso" onchange="autoGuardarEstancia()">
-              <option value="">Selecciona…</option>
-              <option>2025-2026</option>
-              <option>2024-2025</option>
-              <option>2023-2024</option>
-              <option>2022-2023</option>
-              <option>2021-2022</option>
-            </select>
+            <select id="aCurso" onchange="cambioCurso()"></select>
           </div>
           <div class="form-group">
             <label>Nivel / Ciclo</label>
-            <select id="aNivel" onchange="autoGuardarEstancia()">
+            <select id="aNivel" onchange="cambioNivel()">
               <option value="">Selecciona…</option>
               <optgroup label="Grado Básico">
                 <option value="1CFGB">1º CFGB</option>
@@ -1326,6 +1328,8 @@ window.addEventListener('unhandledrejection', function(e) {
           <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.6);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:8px">Empresa</div>
           <div class="form-row" style="margin-bottom:8px">
             <div class="form-group">
+              <input type="text" id="aEmpresaBuscador" placeholder="🔍 Buscar empresa por nombre o CIF…" oninput="filtrarSelectEmpresa()"
+                style="background:rgba(255,255,255,0.12);color:white;border:1px solid rgba(255,255,255,0.25);font-size:13px;margin-bottom:6px">
               <select id="aEmpresa" onchange="autocompletarEmpresa();autoGuardarEstancia()"
                 style="background:rgba(255,255,255,0.12);color:white;border:1px solid rgba(255,255,255,0.25);font-size:13px">
                 <option value="" style="color:var(--gray1)">— Seleccionar empresa registrada —</option>
@@ -1347,16 +1351,17 @@ window.addEventListener('unhandledrejection', function(e) {
         </div>
 
         <!-- Periodo + Contacto -->
-        <div class="form-row col2" style="margin-bottom:10px">
+        <div class="form-row col2" style="margin-bottom:4px">
           <div class="form-group">
             <label>Periodo inicio</label>
-            <input type="date" id="aPeriodoIni" onchange="autoGuardarEstancia()">
+            <input type="date" id="aPeriodoIni" onchange="actualizarDiasEstancia();autoGuardarEstancia()">
           </div>
           <div class="form-group">
             <label>Periodo fin</label>
-            <input type="date" id="aPeriodoFin" onchange="autoGuardarEstancia()">
+            <input type="date" id="aPeriodoFin" onchange="actualizarDiasEstancia();autoGuardarEstancia()">
           </div>
         </div>
+        <div id="aDiasResumen" style="font-size:11px;color:var(--gray3);margin-bottom:10px;min-height:15px"></div>
         <div class="form-row" style="margin-bottom:10px">
           <div class="form-group">
             <label>Contacto empresa</label>
@@ -1368,11 +1373,11 @@ window.addEventListener('unhandledrejection', function(e) {
         <div class="form-row col2" style="margin-bottom:10px">
           <div class="form-group">
             <label>Obs. empresa</label>
-            <textarea id="aObsEmpresa" placeholder="Notas sobre la empresa…" style="min-height:50px" oninput="autoGuardarEstancia()"></textarea>
+            <textarea id="aObsEmpresa" placeholder="Notas sobre la empresa…" style="min-height:110px" oninput="autoGuardarEstancia()"></textarea>
           </div>
           <div class="form-group">
             <label>Obs. alumno/a</label>
-            <textarea id="aObsAlumno" placeholder="Rendimiento, incidencias…" style="min-height:50px" oninput="autoGuardarEstancia()"></textarea>
+            <textarea id="aObsAlumno" placeholder="Rendimiento, incidencias…" style="min-height:110px" oninput="autoGuardarEstancia()"></textarea>
           </div>
         </div>
 
@@ -1445,7 +1450,7 @@ window.addEventListener('unhandledrejection', function(e) {
 
     </div>
     <div class="panel-footer">
-      <button class="btn btn-ghost" onclick="cerrarPanel('overlayAlumno')">Cerrar</button>
+      <button class="btn btn-ghost" onclick="cerrarPanelAlumnoConGuardado()">Cerrar</button>
       <button id="btnGuardarAlumno" class="btn btn-primary" onclick="guardarAlumno()">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
         Guardar alumno
@@ -1656,13 +1661,151 @@ function _mostrarBtnGuardar(btnId, visible) {
   if (btn) btn.style.display = visible ? '' : 'none';
 }
 
+// ── Curso académico (Sep→Jun) ──
+function cursoActualAcademico() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth() + 1; // 1-12
+  return (m >= 9) ? `${y}-${y+1}` : `${y-1}-${y}`;
+}
+
+function generarOpcionesCurso(selectEl, seleccionado) {
+  if (!selectEl) return;
+  const actual = cursoActualAcademico();
+  const yActualIni = parseInt(actual.split('-')[0]);
+  const opciones = [];
+  for (let offset = 1; offset >= -5; offset--) {
+    const ini = yActualIni + offset;
+    opciones.push(`${ini}-${ini+1}`);
+  }
+  if (seleccionado && !opciones.includes(seleccionado)) opciones.unshift(seleccionado);
+  selectEl.innerHTML = '<option value="">Selecciona…</option>' +
+    opciones.map(c => `<option${c===seleccionado?' selected':''}>${escHtml(c)}</option>`).join('');
+}
+
+// ── Combos editables (admin puede añadir valores nuevos) ──
+function prepararSelectEditable(selectId, textoAñadir) {
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
+  const prev = sel.querySelector('option[data-add-new]');
+  if (prev) prev.remove();
+  if (isAdmin()) {
+    const opt = document.createElement('option');
+    opt.value = '__nueva__';
+    opt.textContent = textoAñadir;
+    opt.dataset.addNew = '1';
+    sel.appendChild(opt);
+  }
+}
+
+function _manejarSeleccionEditable(selectId, callbackGuardar) {
+  const sel = document.getElementById(selectId);
+  if (sel.value !== '__nueva__') { callbackGuardar(); return; }
+  const val = (prompt('Introduce el nuevo valor:') || '').trim();
+  if (!val) { sel.value = ''; return; }
+  const addOpt = sel.querySelector('option[data-add-new]');
+  const opt = document.createElement('option');
+  opt.value = val; opt.textContent = val;
+  sel.insertBefore(opt, addOpt);
+  sel.value = val;
+  callbackGuardar();
+}
+
+function cambioFamilia() { _manejarSeleccionEditable('aFamilia', autoGuardarAlumno); }
+function cambioCurso()   { _manejarSeleccionEditable('aCurso',   autoGuardarEstancia); }
+function cambioNivel()   { _manejarSeleccionEditable('aNivel',   autoGuardarEstancia); }
+
+// ── Buscador de empresa (filtra el desplegable) ──
+function filtrarSelectEmpresa() {
+  const q = (document.getElementById('aEmpresaBuscador').value || '').toLowerCase().trim();
+  const sel = document.getElementById('aEmpresa');
+  const actual = sel.value;
+  const empresas = state.empresas.filter(e => !e.deleted && (!q || `${e.nombre} ${e.cif}`.toLowerCase().includes(q)));
+  sel.innerHTML = '<option value="" style="color:var(--gray1)">— Seleccionar empresa registrada —</option>'
+    + empresas.map(e=>'<option value="'+e.id+'" style="background:white;color:var(--gray1)">'+escHtml(e.nombre)+' ('+escHtml(e.cif)+')</option>').join('');
+  if (empresas.some(e => String(e.id) === String(actual))) sel.value = actual;
+}
+
+// ── Calculadora de días del periodo ──
+function actualizarDiasEstancia() {
+  const el = document.getElementById('aDiasResumen');
+  if (!el) return;
+  const ini = document.getElementById('aPeriodoIni').value;
+  const fin = document.getElementById('aPeriodoFin').value;
+  if (!ini || !fin) { el.textContent = ''; return; }
+  const dIni = new Date(ini + 'T00:00:00');
+  const dFin = new Date(fin + 'T00:00:00');
+  if (isNaN(dIni) || isNaN(dFin) || dFin < dIni) { el.textContent = '⚠️ El periodo fin es anterior al inicio.'; return; }
+  let naturales = 0, laborables = 0;
+  for (let d = new Date(dIni); d <= dFin; d.setDate(d.getDate()+1)) {
+    naturales++;
+    const dia = d.getDay(); // 0=domingo, 6=sábado
+    if (dia !== 0 && dia !== 6) laborables++;
+  }
+  el.textContent = `📅 ${naturales} día${naturales!==1?'s':''} natural${naturales!==1?'es':''} · ${laborables} día${laborables!==1?'s':''} de L a V`;
+}
+
+const _autoPending = {};
+
 function _debounceSave(key, fn, ms = 900) {
   clearTimeout(_autoTimers[key]);
+  _autoPending[key] = fn;
   setSaveIndicator('pending');
   _autoTimers[key] = setTimeout(async () => {
-    try { await fn(); setSaveIndicator('saved'); }
+    const f = _autoPending[key]; _autoPending[key] = null;
+    if (!f) return;
+    try { await f(); setSaveIndicator('saved'); }
     catch { setSaveIndicator('error'); }
   }, ms);
+}
+
+// Ejecuta inmediatamente (sin esperar el debounce) el guardado pendiente de "key", si lo hay.
+async function _flushSave(key) {
+  const f = _autoPending[key];
+  clearTimeout(_autoTimers[key]);
+  _autoPending[key] = null;
+  if (!f) return;
+  setSaveIndicator('pending');
+  try { await f(); setSaveIndicator('saved'); }
+  catch { setSaveIndicator('error'); }
+}
+
+// Se llama al cerrar el panel de alumno (✕, "Cerrar" o clic fuera): intenta no perder
+// nada de lo escrito, tanto si el alumno/estancia ya existían (flush del autoguardado
+// pendiente) como si son nuevos y aún no se había pulsado "Guardar".
+async function cerrarPanelAlumnoConGuardado() {
+  const overlay = document.getElementById('overlayAlumno');
+  const fe = document.getElementById('formEstancia');
+  const estId = document.getElementById('estanciaId').value;
+  const estFormVisible = fe && fe.style.display === 'block';
+
+  if (estFormVisible && !estId) {
+    const alumnoIdVal = document.getElementById('alumnoId').value;
+    const curso = document.getElementById('aCurso').value;
+    if (alumnoIdVal && curso) {
+      try { await guardarEstancia(); } catch {}
+    }
+  } else {
+    await _flushSave('estancia');
+  }
+
+  const idEl = document.getElementById('alumnoId').value;
+  const apellidos = document.getElementById('aApellidos').value.trim();
+  const nombre    = document.getElementById('aNombre').value.trim();
+  const dni       = document.getElementById('aDni').value.trim();
+
+  if (!idEl) {
+    if (apellidos && nombre && dni) {
+      try { await guardarAlumno(); } catch {}
+    } else if (apellidos || nombre || dni) {
+      toast('No se ha guardado: faltan Apellidos, Nombre o DNI del alumno.', 'error');
+    }
+  } else {
+    await _flushSave('alumno');
+  }
+
+  overlay?.classList.remove('open');
+  setSaveIndicator('none');
 }
 
 function autoGuardarAlumno() {
@@ -1674,6 +1817,7 @@ function autoGuardarAlumno() {
       nombre:    document.getElementById('aNombre').value.trim(),
       dni:       document.getElementById('aDni').value.trim(),
       familia:   document.getElementById('aFamilia').value,
+      obs:       document.getElementById('aObsPersonal').value.trim(),
     };
     if (!body.apellidos || !body.nombre || !body.dni) return;
     await Alumnado.update(id, body);
@@ -2125,6 +2269,7 @@ function abrirPanelAlumno(id, modo) {
     document.getElementById('alumnoId').value = '';
     ['aApellidos','aNombre','aDni'].forEach(f=>document.getElementById(f).value='');
     document.getElementById('aFamilia').value = '';
+    document.getElementById('aObsPersonal').value = '';
     mostrarFormEstancia(null);
     _mostrarBtnGuardar('btnGuardarAlumno', true);
   } else {
@@ -2134,10 +2279,12 @@ function abrirPanelAlumno(id, modo) {
     document.getElementById('aNombre').value    = a.nombre;
     document.getElementById('aDni').value       = a.dni;
     document.getElementById('aFamilia').value   = a.familia || '';
+    document.getElementById('aObsPersonal').value = a.obs || '';
     renderListaEstancias(a.id);
     mostrarFormEstancia(null);
     if (modoEfectivo === 'datos') _mostrarBtnGuardar('btnGuardarAlumno', false);
   }
+  prepararSelectEditable('aFamilia', '➕ Añadir otra familia profesional…');
   document.getElementById('panelAlumno').scrollTop = 0;
   document.getElementById('overlayAlumno')?.classList.add('open');
 }
@@ -2275,7 +2422,7 @@ function mostrarFormEstancia(estanciaId) {
   document.getElementById('btnsCancelarEstancia').style.display = estanciaId ? 'block' : 'none';
   if (estanciaId) {
     const e = findEstancia(estanciaId);
-    document.getElementById('aCurso').value         = e.curso || '';
+    generarOpcionesCurso(document.getElementById('aCurso'), e.curso || '');
     document.getElementById('aNivel').value         = e.nivel || '';
     document.getElementById('aEmpresa').value       = e.empresaId || '';
     document.getElementById('aEmpresaNombre').value = e.empresaNombre || '';
@@ -2287,10 +2434,14 @@ function mostrarFormEstancia(estanciaId) {
     document.getElementById('aObsAlumno').value     = e.obsAlumno || '';
   } else {
     ['aEmpresaNombre','aEmpresaCif','aPeriodoIni','aPeriodoFin','aContacto','aObsEmpresa','aObsAlumno'].forEach(f=>document.getElementById(f).value='');
-    document.getElementById('aCurso').value='2024-2025';
+    generarOpcionesCurso(document.getElementById('aCurso'), cursoActualAcademico());
     document.getElementById('aNivel').value='';
     document.getElementById('aEmpresa').value='';
   }
+  document.getElementById('aEmpresaBuscador').value = '';
+  prepararSelectEditable('aCurso', '➕ Añadir otro curso académico…');
+  prepararSelectEditable('aNivel', '➕ Añadir otro nivel/ciclo…');
+  actualizarDiasEstancia();
   const fe = document.getElementById('formEstancia');
   if (fe) {
     fe.style.display = estanciaId ? 'block' : 'none';
@@ -2845,9 +2996,10 @@ function descargarBlob(blob, nombre) {
 
 function setSaveIndicator(estado) {
   const icon=document.getElementById('saveIcon'), text=document.getElementById('saveText');
-  if(!icon) return;
   const m={'saved':['✅','Guardado'],'pending':['⏳','Guardando…'],'error':['⚠️','Error'],'none':['','']};
-  if(m[estado]){icon.textContent=m[estado][0];text.textContent=m[estado][1];}
+  if(icon && m[estado]){icon.textContent=m[estado][0];text.textContent=m[estado][1];}
+  const panelInd = document.getElementById('panelAlumnoSaveIndicator');
+  if (panelInd && m[estado]) panelInd.innerHTML = m[estado][0] ? `${m[estado][0]} ${m[estado][1]}` : '';
 }
 function autoguardar() {}
 
@@ -3002,7 +3154,7 @@ async function guardarAlumno() {
   const nombre=document.getElementById('aNombre').value.trim();
   const dni=document.getElementById('aDni').value.trim();
   if(!apellidos||!nombre||!dni){toast('Apellidos, nombre y DNI son obligatorios','error');return;}
-  const body={apellidos,nombre,dni,familia:document.getElementById('aFamilia').value};
+  const body={apellidos,nombre,dni,familia:document.getElementById('aFamilia').value,obs:document.getElementById('aObsPersonal').value.trim()};
   const idEl=document.getElementById('alumnoId').value;
   try {
     setSaveIndicator('pending');

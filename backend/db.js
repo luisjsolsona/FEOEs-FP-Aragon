@@ -96,6 +96,7 @@ const migs = [
   `ALTER TABLE estancias ADD COLUMN calificacion TEXT`,
   `ALTER TABLE estancias ADD COLUMN supervisor_id INTEGER`,
   `ALTER TABLE estancias ADD COLUMN supervisor_nombre TEXT`,
+  `ALTER TABLE alumnado ADD COLUMN obs TEXT`,
 ];
 for (const sql of migs) {
   try { db.exec(sql); }

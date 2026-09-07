@@ -8,7 +8,7 @@ const router = express.Router();
 router.get('/', requireAuth, (req, res) => {
   const rows = db.prepare(`
     SELECT
-      a.id, a.apellidos, a.nombre, a.dni, a.familia, a.deleted, a.created_at, a.updated_at,
+      a.id, a.apellidos, a.nombre, a.dni, a.familia, a.obs, a.deleted, a.created_at, a.updated_at,
       json_group_array(
         CASE WHEN e.id IS NULL THEN NULL ELSE json_object(
           'id',                        e.id,
@@ -52,18 +52,18 @@ router.get('/', requireAuth, (req, res) => {
 
 // POST /api/alumnado — upsert por DNI
 router.post('/', requireProfe, (req, res) => {
-  const { apellidos, nombre, dni, familia } = req.body;
+  const { apellidos, nombre, dni, familia, obs } = req.body;
   if (!apellidos || !nombre || !dni) return res.status(400).json({ error: 'Apellidos, nombre y DNI son obligatorios.' });
   const dniUp = dni.toUpperCase().trim();
   const exist = db.prepare('SELECT * FROM alumnado WHERE dni = ?').get(dniUp);
   if (exist) {
-    db.prepare(`UPDATE alumnado SET apellidos=?,nombre=?,familia=?,deleted=0,updated_at=datetime('now') WHERE id=?`)
-      .run(apellidos, nombre, familia||null, exist.id);
-    return res.json({ alumno: { ...exist, apellidos, nombre, familia }, updated: true });
+    db.prepare(`UPDATE alumnado SET apellidos=?,nombre=?,familia=?,obs=?,deleted=0,updated_at=datetime('now') WHERE id=?`)
+      .run(apellidos, nombre, familia||null, obs??exist.obs, exist.id);
+    return res.json({ alumno: { ...exist, apellidos, nombre, familia, obs: obs??exist.obs }, updated: true });
   }
-  const r = db.prepare(`INSERT INTO alumnado (apellidos,nombre,dni,familia) VALUES (?,?,?,?)`)
-    .run(apellidos, nombre, dniUp, familia||null);
-  res.status(201).json({ alumno: { id: r.lastInsertRowid, apellidos, nombre, dni: dniUp, familia } });
+  const r = db.prepare(`INSERT INTO alumnado (apellidos,nombre,dni,familia,obs) VALUES (?,?,?,?,?)`)
+    .run(apellidos, nombre, dniUp, familia||null, obs||null);
+  res.status(201).json({ alumno: { id: r.lastInsertRowid, apellidos, nombre, dni: dniUp, familia, obs } });
 });
 
 // PUT /api/alumnado/:id
@@ -71,9 +71,9 @@ router.put('/:id', requireProfe, (req, res) => {
   const id = parseInt(req.params.id);
   const a = db.prepare('SELECT * FROM alumnado WHERE id = ?').get(id);
   if (!a) return res.status(404).json({ error: 'Alumno no encontrado.' });
-  const { apellidos, nombre, familia } = req.body;
-  db.prepare(`UPDATE alumnado SET apellidos=?,nombre=?,familia=?,updated_at=datetime('now') WHERE id=?`)
-    .run(apellidos??a.apellidos, nombre??a.nombre, familia??a.familia, id);
+  const { apellidos, nombre, familia, obs } = req.body;
+  db.prepare(`UPDATE alumnado SET apellidos=?,nombre=?,familia=?,obs=?,updated_at=datetime('now') WHERE id=?`)
+    .run(apellidos??a.apellidos, nombre??a.nombre, familia??a.familia, obs??a.obs, id);
   res.json({ ok: true });
 });
 
