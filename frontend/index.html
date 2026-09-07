@@ -1964,26 +1964,26 @@ function renderTabla() {
       <td style="padding:8px 8px 8px 14px;width:32px" onclick="event.stopPropagation()">${canValidate()?`<input type="checkbox" class="cb-row" data-id="${f.id}" ${sel?'checked':''} onclick="toggleSelRow(${f.id},this)">`:'&nbsp;'}</td>
       <td class="mono" style="color:var(--gray4);width:40px">${String(f.id).padStart(3,'0')}</td>
       <td style="min-width:160px">
-        <div class="cell-name">${f.apellidos}, ${f.nombre}</div>
-        <div class="mono" style="font-size:11px;color:var(--gray4)">${f.dni}</div>
+        <div class="cell-name">${escHtml(f.apellidos)}, ${escHtml(f.nombre)}</div>
+        <div class="mono" style="font-size:11px;color:var(--gray4)">${escHtml(f.dni)}</div>
       </td>
-      <td class="hide-mobile" style="min-width:140px;font-size:11px;color:var(--gray3)">${fS(f.familia)||'—'}</td>
+      <td class="hide-mobile" style="min-width:140px;font-size:11px;color:var(--gray3)">${escHtml(fS(f.familia))||'—'}</td>
       <td style="min-width:110px">
-        ${u?`<span class="badge badge-curso" style="display:inline-block;margin-bottom:3px">${u.curso}</span>
-             <span class="badge" style="display:inline-block;background:${NB[u.nivel]||'var(--gray6)'};color:${NC[u.nivel]||'var(--gray3)'}">${u.nivel||'—'}</span>`
+        ${u?`<span class="badge badge-curso" style="display:inline-block;margin-bottom:3px">${escHtml(u.curso)}</span>
+             <span class="badge" style="display:inline-block;background:${NB[u.nivel]||'var(--gray6)'};color:${NC[u.nivel]||'var(--gray3)'}">${escHtml(u.nivel)||'—'}</span>`
           :'<span style="color:var(--gray4);font-size:12px">Sin estancias</span>'}
         ${n>1?`<div style="font-size:10px;color:var(--az);margin-top:3px;cursor:pointer" onclick="abrirPanelAlumno(${f.id})">📅 ${n} estancias</div>`:''}
       </td>
       <td style="min-width:130px">
-        ${u?`<div class="cell-empresa">${u.empresaNombre||'—'}</div>
-             <div class="mono" style="font-size:11px;color:var(--gray4)">${u.empresaCif||''}</div>`
+        ${u?`<div class="cell-empresa">${escHtml(u.empresaNombre)||'—'}</div>
+             <div class="mono" style="font-size:11px;color:var(--gray4)">${escHtml(u.empresaCif)||''}</div>`
           :'<span style="color:var(--gray4);font-size:12px">—</span>'}
       </td>
       <td class="hide-mobile" style="font-size:12px;color:var(--gray3);min-width:100px">
         ${u&&u.periodoIni?`${formatFecha(u.periodoIni)} \u2192<br>${formatFecha(u.periodoFin)}`:'—'}
       </td>
       <td class="hide-mobile" style="font-size:12px;color:var(--gray3);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(u?.obsAlumno||'')}">
-        ${u?.obsAlumno?'📝 '+u.obsAlumno:'—'}
+        ${u?.obsAlumno?'📝 '+escHtml(u.obsAlumno):'—'}
       </td>
       <td style="min-width:200px" onclick="event.stopPropagation()">
         <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
@@ -2415,9 +2415,9 @@ function renderEmpresas() {
     <div class="empresa-card">
       <div class="empresa-card-header" onclick="toggleEmpCard(${e.id})">
         <div>
-          <div class="empresa-name">🏢 ${e.nombre}</div>
-          <div class="empresa-meta mono">${e.cif}${e.sector ? ` · ${e.sector}` : ''}${e.direccion ? ` · ${e.direccion}` : '<span style="color:var(--red)"> · Sin dirección</span>'}</div>
-          ${e.contactoNombre ? `<div class="empresa-meta">👤 ${e.contactoNombre}${e.contactoCargo?' ('+e.contactoCargo+')':''}${e.contactoTel?' · '+e.contactoTel:''}</div>` : ''}
+          <div class="empresa-name">🏢 ${escHtml(e.nombre)}</div>
+          <div class="empresa-meta mono">${escHtml(e.cif)}${e.sector ? ` · ${escHtml(e.sector)}` : ''}${e.direccion ? ` · ${escHtml(e.direccion)}` : '<span style="color:var(--red)"> · Sin dirección</span>'}</div>
+          ${e.contactoNombre ? `<div class="empresa-meta">👤 ${escHtml(e.contactoNombre)}${e.contactoCargo?' ('+escHtml(e.contactoCargo)+')':''}${e.contactoTel?' · '+escHtml(e.contactoTel):''}</div>` : ''}
         </div>
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end">
           ${mapaBadge}
@@ -2427,7 +2427,7 @@ function renderEmpresas() {
         </div>
       </div>
       <div class="empresa-card-body" id="empcard-${e.id}" style="display:none">
-        ${e.obs ? `<div style="padding:10px 14px;font-size:12px;color:var(--gray2);background:var(--gold-light);border-bottom:var(--border)">📝 ${e.obs}</div>` : ''}
+        ${e.obs ? `<div style="padding:10px 14px;font-size:12px;color:var(--gray2);background:var(--gold-light);border-bottom:var(--border)">📝 ${escHtml(e.obs)}</div>` : ''}
         ${Object.keys(byYear).sort().reverse().map(curso => `
           <div style="padding:8px 14px;font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--gray3);background:var(--gray7);border-bottom:var(--border)">
             Curso ${curso}
@@ -2439,8 +2439,8 @@ function renderEmpresas() {
               const vIcon  = a.nVisitas===0 ? '⚠' : a.nVisitas<2 ? '⏳' : '✓';
               return `<tr>
                 <td class="mono" style="color:var(--gray4);width:40px">${a.nivel||'—'}</td>
-                <td style="font-weight:500">${a.apellidos}, ${a.nombre}</td>
-                <td class="mono" style="color:var(--gray3)">${a.dni}</td>
+                <td style="font-weight:500">${escHtml(a.apellidos)}, ${escHtml(a.nombre)}</td>
+                <td class="mono" style="color:var(--gray3)">${escHtml(a.dni)}</td>
                 <td style="color:var(--gray3)">${a.periodoIni ? formatFecha(a.periodoIni)+' → '+formatFecha(a.periodoFin) : '—'}</td>
                 <td><span style="display:inline-flex;align-items:center;gap:4px;background:${vBg};color:${vColor};border-radius:4px;padding:2px 8px;font-size:12px;font-weight:700">${vIcon} ${a.nVisitas} visita${a.nVisitas!==1?'s':''}${a.nPend>0?' · <span style="font-weight:400;font-size:11px">'+a.nPend+' pend.</span>':''}</span></td>
                 <td><button class="btn btn-sm btn-secondary" onclick="abrirPanelAlumno(${a.alumnoId})">✏️ Editar</button></td>
@@ -3902,9 +3902,9 @@ function renderMapaMarkers() {
         <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border:var(--border);border-radius:4px;background:var(--gray7)">
           <span style="font-size:16px">${estadoIcon}</span>
           <div style="flex:1;min-width:0">
-            <div style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${emp.nombre}</div>
+            <div style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(emp.nombre)}</div>
             <div style="font-size:11px;color:${estadoColor}">${estadoTxt}${tieneDir ? '' : ' — añade dirección en la ficha'}</div>
-            ${tieneDir ? `<div style="font-size:10px;color:var(--gray4);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${emp.direccion}</div>` : ''}
+            ${tieneDir ? `<div style="font-size:10px;color:var(--gray4);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(emp.direccion)}</div>` : ''}
           </div>
           <span style="font-size:11px;font-weight:700;color:var(--az);font-family:var(--mono);flex-shrink:0">${nAct > 0 ? nAct+'👤' : ''}</span>
           ${btnGeo}
@@ -3957,21 +3957,21 @@ function buildPopupHTML(emp, alumnosActuales, alumnosHistorico, curso) {
 
   let html = `<div class="emp-popup">
     <div class="emp-popup-header">
-      <div class="emp-popup-name">🏢 ${emp.nombre}</div>
-      <div class="emp-popup-meta">${emp.cif}${emp.sector ? ' · ' + emp.sector : ''}</div>
+      <div class="emp-popup-name">🏢 ${escHtml(emp.nombre)}</div>
+      <div class="emp-popup-meta">${escHtml(emp.cif)}${emp.sector ? ' · ' + escHtml(emp.sector) : ''}</div>
     </div>`;
 
   if (emp.direccion) {
-    html += `<div class="emp-popup-row"><b>📍 Dirección</b>${emp.direccion}</div>`;
+    html += `<div class="emp-popup-row"><b>📍 Dirección</b>${escHtml(emp.direccion)}</div>`;
   }
   if (emp.contactoNombre) {
-    html += `<div class="emp-popup-row"><b>👤 Contacto</b>${emp.contactoNombre}${emp.contactoCargo ? ' ('+emp.contactoCargo+')' : ''}</div>`;
+    html += `<div class="emp-popup-row"><b>👤 Contacto</b>${escHtml(emp.contactoNombre)}${emp.contactoCargo ? ' ('+escHtml(emp.contactoCargo)+')' : ''}</div>`;
   }
   if (emp.contactoTel) {
-    html += `<div class="emp-popup-row"><b>📞 Teléfono</b><a href="tel:${emp.contactoTel}" style="color:var(--az)">${emp.contactoTel}</a></div>`;
+    html += `<div class="emp-popup-row"><b>📞 Teléfono</b><a href="tel:${esc(emp.contactoTel)}" style="color:var(--az)">${escHtml(emp.contactoTel)}</a></div>`;
   }
   if (emp.contactoEmail) {
-    html += `<div class="emp-popup-row"><b>✉️ Email</b><a href="mailto:${emp.contactoEmail}" style="color:var(--az)">${emp.contactoEmail}</a></div>`;
+    html += `<div class="emp-popup-row"><b>✉️ Email</b><a href="mailto:${esc(emp.contactoEmail)}" style="color:var(--az)">${escHtml(emp.contactoEmail)}</a></div>`;
   }
 
   // Alumnado actual
@@ -3979,7 +3979,7 @@ function buildPopupHTML(emp, alumnosActuales, alumnosHistorico, curso) {
   if (nAct > 0) {
     html += '<div style="line-height:1.8">';
     alumnosActuales.forEach(a => {
-      html += `<span class="emp-alumno-chip">👤 ${a.apellidos}, ${a.nombre} <span style="opacity:0.7;font-size:10px">${a.nivel||''}</span></span>`;
+      html += `<span class="emp-alumno-chip">👤 ${escHtml(a.apellidos)}, ${escHtml(a.nombre)} <span style="opacity:0.7;font-size:10px">${escHtml(a.nivel)||''}</span></span>`;
     });
     html += '</div>';
   } else {
@@ -3992,7 +3992,7 @@ function buildPopupHTML(emp, alumnosActuales, alumnosHistorico, curso) {
     html += `<div class="emp-popup-section">Histórico (${nHist} en ${cursosHist.length} curso${cursosHist.length>1?'s':''})</div>`;
     html += '<div style="line-height:1.8">';
     alumnosHistorico.slice(0,6).forEach(a => {
-      html += `<span class="emp-alumno-chip old">📋 ${a.apellidos} <span style="opacity:0.6">${a.curso}</span></span>`;
+      html += `<span class="emp-alumno-chip old">📋 ${escHtml(a.apellidos)} <span style="opacity:0.6">${escHtml(a.curso)}</span></span>`;
     });
     if (nHist > 6) html += `<span style="font-size:11px;color:var(--gray4)"> +${nHist-6} más…</span>`;
     html += '</div>';
