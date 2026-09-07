@@ -27,6 +27,12 @@ Aplicación web para la gestión de las **Formación en Empresa u Organismo Equi
 
 ---
 
+## Prospección de empresas
+
+En [`docs/prospeccion/`](docs/prospeccion/) hay un listado de ~100 empresas TIC de Zaragoza (Excel + CSV) para la prospección del tutor/a dual general (Decreto 91/2024, art. 57.4).
+
+---
+
 ## Instalación y arranque
 
 **Requisitos:** Docker + Docker Compose
