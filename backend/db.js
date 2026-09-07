@@ -70,6 +70,18 @@ db.exec(`
     solicitante TEXT NOT NULL, resuelto INTEGER NOT NULL DEFAULT 0,
     aprobado INTEGER, created_at TEXT NOT NULL DEFAULT (datetime('now')), resolved_at TEXT
   );
+  CREATE TABLE IF NOT EXISTS prospeccion_historial (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    empresa_id   INTEGER NOT NULL REFERENCES empresas(id) ON DELETE CASCADE,
+    estado       TEXT NOT NULL,
+    nota         TEXT,
+    autor_id     INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    autor_nombre TEXT,
+    deleted      INTEGER NOT NULL DEFAULT 0,
+    created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_prospeccion_hist_empresa ON prospeccion_historial(empresa_id);
   CREATE TABLE IF NOT EXISTS historial (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     tipo TEXT NOT NULL, texto TEXT NOT NULL, usuario TEXT NOT NULL,

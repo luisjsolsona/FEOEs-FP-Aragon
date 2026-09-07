@@ -65,22 +65,47 @@ router.put('/:id', requireProfe, (req, res) => {
 });
 
 // PUT /api/empresas/:id/prospeccion — marcar estado de prospección (llamado/pendiente/ok/rechazada/sin_contactar)
+// y dejar constancia en el histórico con la nota escrita en ese momento.
 const ESTADOS_PROSPECCION = ['sin_contactar', 'llamado', 'pendiente', 'ok', 'rechazada'];
 router.put('/:id/prospeccion', requireProfe, (req, res) => {
   const id = parseInt(req.params.id);
   const e = db.prepare('SELECT * FROM empresas WHERE id = ?').get(id);
   if (!e) return res.status(404).json({ error: 'Empresa no encontrada.' });
 
-  const { estado, notas } = req.body;
-  if (estado !== undefined && !ESTADOS_PROSPECCION.includes(estado)) {
+  const { estado, nota } = req.body;
+  if (!estado || !ESTADOS_PROSPECCION.includes(estado)) {
     return res.status(400).json({ error: 'Estado de prospección inválido.' });
   }
   const contacto = req.user.nombre || req.user.role;
   const fecha = new Date().toISOString().slice(0, 10);
 
-  db.prepare(`UPDATE empresas SET prospeccion_estado=?, prospeccion_fecha=?, prospeccion_contacto=?, prospeccion_notas=?, updated_at=datetime('now') WHERE id=?`)
-    .run(estado ?? e.prospeccion_estado, fecha, contacto, notas ?? e.prospeccion_notas, id);
-  res.json({ ok: true, prospeccion_estado: estado ?? e.prospeccion_estado, prospeccion_fecha: fecha, prospeccion_contacto: contacto });
+  db.prepare(`UPDATE empresas SET prospeccion_estado=?, prospeccion_fecha=?, prospeccion_contacto=?, updated_at=datetime('now') WHERE id=?`)
+    .run(estado, fecha, contacto, id);
+
+  const r = db.prepare(`INSERT INTO prospeccion_historial (empresa_id, estado, nota, autor_id, autor_nombre) VALUES (?,?,?,?,?)`)
+    .run(id, estado, nota || null, req.user.id, contacto);
+
+  res.json({ ok: true, prospeccion_estado: estado, prospeccion_fecha: fecha, prospeccion_contacto: contacto, historial_id: r.lastInsertRowid });
+});
+
+// GET /api/empresas/:id/prospeccion-historial
+router.get('/:id/prospeccion-historial', requireAuth, (req, res) => {
+  const id = parseInt(req.params.id);
+  const historial = db.prepare(`SELECT * FROM prospeccion_historial WHERE empresa_id = ? AND deleted = 0 ORDER BY created_at DESC`).all(id);
+  res.json({ historial });
+});
+
+// PUT /api/empresas/:empresaId/prospeccion-historial/:histId — solo el autor puede editar su propia nota
+router.put('/:empresaId/prospeccion-historial/:histId', requireProfe, (req, res) => {
+  const empresaId = parseInt(req.params.empresaId);
+  const histId = parseInt(req.params.histId);
+  const h = db.prepare('SELECT * FROM prospeccion_historial WHERE id = ? AND empresa_id = ? AND deleted = 0').get(histId, empresaId);
+  if (!h) return res.status(404).json({ error: 'Entrada de histórico no encontrada.' });
+  if (h.autor_id !== req.user.id) return res.status(403).json({ error: 'Solo puedes editar tus propias notas.' });
+
+  const { nota } = req.body;
+  db.prepare(`UPDATE prospeccion_historial SET nota=?, updated_at=datetime('now') WHERE id=?`).run(nota ?? h.nota, histId);
+  res.json({ ok: true });
 });
 
 // DELETE /api/empresas/:id — solo admin
