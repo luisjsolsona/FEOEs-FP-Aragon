@@ -3317,7 +3317,7 @@ function exportarExcel() {
   const wb=XLSX.utils.book_new(), ws=XLSX.utils.aoa_to_sheet(rows);
   ws['!cols']=[6,20,14,12,28,11,8,28,12,13,13,30,35,35].map(w=>({wch:w}));
   XLSX.utils.book_append_sheet(wb,ws,'Estancias_FEOE');
-  XLSX.writeFile(wb,'FEOE_estancias_'+new Date().toISOString().slice(0,10)+'.xlsx');
+  XLSX.writeFile(wb,'Alumnado-FEOE_estancias_'+new Date().toISOString().slice(0,10)+'.xlsx');
   toast('Excel exportado: '+data.length+' estancias','success');
 }
 function exportarCSV() {
@@ -3326,7 +3326,7 @@ function exportarCSV() {
   const cab='ID_Alumno,Apellidos,Nombre,DNI_NIE,Familia,Curso,Nivel,Empresa,CIF,Periodo_Inicio,Periodo_Fin,Contacto,Obs_Empresa,Obs_Alumno';
   const filas=data.map(r=>[r.alumnoId,r.apellidos,r.nombre,r.dni,r.familia||'',r.curso,r.nivel||'',r.empresaNombre,r.empresaCif,r.periodoIni,r.periodoFin,r.contacto,r.obsEmpresa,r.obsAlumno]
     .map(v=>'"'+String(v||'').replace(/"/g,'""')+'"').join(','));
-  descargarBlob(new Blob(['\uFEFF'+cab+'\n'+filas.join('\n')],{type:'text/csv;charset=utf-8'}),'FEOE_estancias_'+new Date().toISOString().slice(0,10)+'.csv');
+  descargarBlob(new Blob(['\uFEFF'+cab+'\n'+filas.join('\n')],{type:'text/csv;charset=utf-8'}),'Alumnado-FEOE_estancias_'+new Date().toISOString().slice(0,10)+'.csv');
   toast('CSV exportado: '+data.length+' estancias','success');
 }
 function exportarEmpresasExcel() {
@@ -3359,7 +3359,7 @@ function exportarEmpresasExcel() {
   ws2['!cols']=[30,12,18,14,12,11,8,13,13,24,30,30].map(w=>({wch:w}));
   XLSX.utils.book_append_sheet(wb,ws2,'Relacion_Alumnos_Empresa');
 
-  XLSX.writeFile(wb,'FEOE_empresas_'+new Date().toISOString().slice(0,10)+'.xlsx');
+  XLSX.writeFile(wb,'Empresas-FEOE_empresas_'+new Date().toISOString().slice(0,10)+'.xlsx');
   toast('Excel exportado: '+filtradas.length+' empresas, '+relacion.length+' estancias','success');
 }
 async function borrarTodosLosDatos() {
