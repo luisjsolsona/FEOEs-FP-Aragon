@@ -2949,8 +2949,10 @@ const CAMPOS = {
     { key:'apellidos',     label:'Apellidos',            required:true  },
     { key:'nombre',        label:'Nombre',               required:true  },
     { key:'dni',           label:'DNI/NIE',              required:true  },
+    { key:'fechaNacimiento', label:'Fecha de nacimiento', required:false },
+    { key:'telefono1',     label:'Teléfono 1',           required:false },
+    { key:'telefono2',     label:'Teléfono 2',           required:false },
     { key:'curso',         label:'Curso académico',      required:true  },
-    { key:'familia',       label:'Familia Profesional',  required:false },
     { key:'nivel',         label:'Nivel / Ciclo',        required:false },
     { key:'empresaNombre', label:'Empresa',              required:false },
     { key:'empresaCif',    label:'CIF',                  required:false },
@@ -2959,6 +2961,7 @@ const CAMPOS = {
     { key:'contacto',      label:'Contacto Empresa',     required:false },
     { key:'obsEmpresa',    label:'Obs. Empresa',         required:false },
     { key:'obsAlumno',     label:'Obs. Alumno',          required:false },
+    { key:'obsPersonal',   label:'Obs. Personal alumno', required:false },
   ],
   empresas: [
     { key:'nombre',         label:'Nombre',            required:true  },
@@ -2978,8 +2981,10 @@ const SINONIMOS = {
   apellidos:      ['apellidos','apellido','surname','last_name','lastname'],
   nombre:         ['nombre','name','first_name','firstname'],
   dni:            ['dni','nie','dni_nie','nif','documento'],
+  fechaNacimiento:['fecha_nacimiento','fecha_nac','birth_date','fecha_de_nacimiento','nacimiento'],
+  telefono1:      ['telefono1','telefono_1','tel1','telefono','phone1'],
+  telefono2:      ['telefono2','telefono_2','tel2','phone2'],
   curso:          ['curso','year','anio','año','curso_academico','academic_year'],
-  familia:        ['familia','familia_profesional','fp','family','ciclo_familia','professional_family'],
   nivel:          ['nivel','ciclo','nivel_ciclo','grado','level','curso_nivel','tipo_ciclo'],
   empresaNombre:  ['empresa','empresa_nombre','company','nombre_empresa'],
   empresaCif:     ['cif','nif_empresa','company_id','cif_empresa'],
@@ -2988,6 +2993,7 @@ const SINONIMOS = {
   contacto:       ['contacto','contacto_empresa','tutor_empresa','contact'],
   obsEmpresa:     ['obs_empresa','observaciones_empresa','notas_empresa','obs_company'],
   obsAlumno:      ['obs_alumno','observaciones','obs_alumno','notas','notes','observaciones_alumno'],
+  obsPersonal:    ['obs_personal','observaciones_personales','notas_personales','personal_notes'],
   nombre_e:       ['nombre'],
   cif:            ['cif','nif'],
   sector:         ['sector','actividad','industry'],
@@ -3169,33 +3175,34 @@ function validarImport() {
 function descargarPlantilla(formato) {
   const isAlumnado = importTipo === 'alumnado';
   const nombre = isAlumnado ? 'plantilla_alumnado_FEOE' : 'plantilla_empresas_FEOE';
+
+  const headers = {
+    alumnado: ['Apellidos','Nombre','DNI_NIE','Fecha_Nacimiento','Telefono1','Telefono2','Curso','Nivel_Ciclo','Empresa','CIF','Periodo_Inicio','Periodo_Fin','Contacto_Empresa','Obs_Empresa','Obs_Alumno','Obs_Personal'],
+    empresas: ['Nombre','CIF','Sector','Direccion','Contacto_Nombre','Contacto_Cargo','Contacto_Telefono','Contacto_Email','Observaciones']
+  };
+  const ejemplo = {
+    alumnado: [
+      ['García López','Carlos','12345678A','2007-04-12','600111222','','2025-2026','2CFGM','Mi Empresa S.L.','B12345678','2026-03-02','2026-06-19','Ana Pérez — 976 000 000','Soporte técnico','Buen rendimiento',''],
+      ['Martínez Sanz','Laura','23456789B','2006-11-30','600333444','976555666','2025-2026','2CFGS','Otra Empresa S.A.','A87654321','2026-03-02','2026-06-19','Juan García — 976 111 222','','',''],
+    ],
+    empresas: [['Mi Empresa S.L.','B12345678','Informática','C/ Ejemplo 1 Zaragoza','Ana Pérez','Tutora empresa','976 000 000','aperez@empresa.com','Primera colaboración']]
+  };
+  const notaValidacion = isAlumnado
+    ? ['','','','AAAA-MM-DD','','','2025-2026','Valores: 1CFGB / 2CFGB / 1CFGM / 2CFGM / 1CFGS / 2CFGS / CE','','','AAAA-MM-DD','AAAA-MM-DD','','','','']
+    : null;
+
   if (formato === 'csv') {
-    const csv = isAlumnado ? PLANTILLAS.alumnado_csv : PLANTILLAS.empresas_csv;
+    const filas = [headers[importTipo], ...ejemplo[importTipo]];
+    const csv = filas.map(f => f.map(v => '"'+String(v||'').replace(/"/g,'""')+'"').join(',')).join('\n');
     const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8'});
     descargarBlob(blob, nombre+'.csv');
   } else {
-    const headers = {
-      alumnado: ['Apellidos','Nombre','DNI_NIE','Curso','Familia_Profesional','Nivel_Ciclo','Empresa','CIF','Periodo_Inicio','Periodo_Fin','Contacto_Empresa','Obs_Empresa','Obs_Alumno'],
-      empresas: ['Nombre','CIF','Sector','Direccion','Contacto_Nombre','Contacto_Cargo','Contacto_Telefono','Contacto_Email','Observaciones']
-    };
-    const ejemplo = {
-      alumnado: [
-        ['García López','Carlos','12345678A','2024-2025','INFORMÁTICA Y COMUNICACIONES','2CFGM','Mi Empresa S.L.','B12345678','2025-03-03','2025-06-20','Ana Pérez — 976 000 000','Soporte técnico','Buen rendimiento'],
-        ['Martínez Sanz','Laura','23456789B','2024-2025','ADMINISTRACIÓN Y GESTIÓN','2CFGS','Otra Empresa S.A.','A87654321','2025-03-03','2025-06-20','Juan García — 976 111 222','',''],
-      ],
-      empresas: [['Mi Empresa S.L.','B12345678','Informática','C/ Ejemplo 1 Zaragoza','Ana Pérez','Tutora empresa','976 000 000','aperez@empresa.com','Primera colaboración']]
-    };
-    const wb = XLSX.utils.book_new();
     const wsData = [headers[importTipo], ...ejemplo[importTipo]];
+    if (notaValidacion) wsData.push(notaValidacion);
     const ws = XLSX.utils.aoa_to_sheet(wsData);
-    ws['!cols'] = headers[importTipo].map((_,i) => ({wch: i<4?14:i<6?28:i<8?12:24}));
-    // Fila de notas de validación en fila 4
-    if (isAlumnado) {
-      wsData.push(['','','','','Valores: INFORMÁTICA Y COMUNICACIONES / ADMINISTRACIÓN Y GESTIÓN / COMERCIO Y MARKETING / ELECTRICIDAD Y ELECTRÓNICA / SANIDAD / etc.','Valores: 1CFGB / 2CFGB / 1CFGM / 2CFGM / 1CFGS / 2CFGS / CE','','','AAAA-MM-DD','AAAA-MM-DD','','','']);
-    }
-    const ws2 = XLSX.utils.aoa_to_sheet(wsData);
-    ws2['!cols'] = headers[importTipo].map((_,i) => ({wch: i<4?14:i<6?32:i<8?12:24}));
-    XLSX.utils.book_append_sheet(wb, ws2, isAlumnado?'Alumnado_FEOE':'Empresas_FEOE');
+    ws['!cols'] = headers[importTipo].map((_,i) => ({wch: i<3?14:i<7?14:i<9?28:i<11?12:24}));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, isAlumnado?'Alumnado_FEOE':'Empresas_FEOE');
     XLSX.writeFile(wb, nombre+'.xlsx');
   }
 }
@@ -3574,7 +3581,13 @@ async function ejecutarImport() {
       try{
         const empCif=row[getCol('empresaCif')]?.trim()||'';
         const emp=state.empresas.find(e=>e.cif===empCif&&!e.deleted);
-        const{alumno,updated}=await Alumnado.create({apellidos,nombre,dni,familia:row[getCol('familia')]?.trim()||''});
+        const{alumno,updated}=await Alumnado.create({
+          apellidos,nombre,dni,
+          fecha_nacimiento:row[getCol('fechaNacimiento')]?.trim()||'',
+          telefono1:row[getCol('telefono1')]?.trim()||'',
+          telefono2:row[getCol('telefono2')]?.trim()||'',
+          obs:row[getCol('obsPersonal')]?.trim()||''
+        });
         if(updated)ac++;else cr++;
         if(curso){
           const body={alumno_id:alumno.id,curso,nivel:row[getCol('nivel')]?.trim()||'',empresa_id:emp?.id||null,empresa_nombre:row[getCol('empresaNombre')]?.trim()||'',empresa_cif:empCif,periodo_ini:row[getCol('periodoIni')]?.trim()||'',periodo_fin:row[getCol('periodoFin')]?.trim()||'',contacto:row[getCol('contacto')]?.trim()||'',obs_empresa:row[getCol('obsEmpresa')]?.trim()||'',obs_alumno:row[getCol('obsAlumno')]?.trim()||''};
