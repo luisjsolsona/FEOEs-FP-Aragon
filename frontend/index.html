@@ -1016,6 +1016,9 @@ window.addEventListener('unhandledrejection', function(e) {
       <select class="filter-select" id="filterMapaCurso" onchange="filtrarMapa()">
         <option value="">Todos los cursos</option>
       </select>
+      <select class="filter-select" id="filterMapaProspeccion" onchange="filtrarMapa()">
+        <option value="">Todos los estados de prospección</option>
+      </select>
       <button class="btn btn-secondary" style="padding:10px 16px;font-size:14px" onclick="geocodificarTodas(false)" id="btnGeoAll" title="Geolocaliza solo las empresas con dirección que aún no tienen coordenadas">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
         Geocodificar
@@ -4286,8 +4289,17 @@ function renderMapaMarkers() {
   const cursoActual = cursoActualAcademico();
   const cursoRef = fCurso || cursoActual;
 
+  // Poblar el filtro de prospección una sola vez (reutiliza PROSPECCION_INFO de Empresas)
+  const selProspMapa = document.getElementById('filterMapaProspeccion');
+  if (selProspMapa && selProspMapa.options.length <= 1) {
+    selProspMapa.innerHTML = '<option value="">Todos los estados de prospección</option>'
+      + Object.entries(PROSPECCION_INFO).map(([key,info]) => `<option value="${key}">${info.icon} ${info.label}</option>`).join('');
+  }
+  const fProspMapa = selProspMapa?.value || '';
+
   const bounds = [];
-  const todasEmpresas = state.empresas.filter(e => !e.deleted);
+  let todasEmpresas = state.empresas.filter(e => !e.deleted);
+  if (fProspMapa) todasEmpresas = todasEmpresas.filter(e => (e.prospeccionEstado || 'sin_contactar') === fProspMapa);
 
   // ── Listado lateral (izquierda) ──
   const listaEl = document.getElementById('mapaListaEmpresas');
