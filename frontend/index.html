@@ -2299,6 +2299,8 @@ function actualizarContadores() {
   document.getElementById('cnt-alumnado').textContent   = state.alumnado.filter(a=>!a.deleted).length;
   document.getElementById('cnt-empresas').textContent   = state.empresas.filter(e=>!e.deleted).length;
   document.getElementById('cnt-pendientes').textContent = state.pendientes.filter(p=>!p.resuelto).length;
+  const cntUsuarios = document.getElementById('cnt-usuarios');
+  if (cntUsuarios) cntUsuarios.textContent = (state.usuarios||[]).filter(u=>u.activo).length;
 }
 
 // ══════════════════════════════════════════
