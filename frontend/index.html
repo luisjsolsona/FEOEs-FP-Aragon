@@ -4273,8 +4273,17 @@ async function geocodificarTodas(forzar = false) {
 // Parsea el formato habitual español: "Calle X, N, CP, Ciudad"
 // Intenta primero con parámetros estructurados (más preciso), luego con query libre.
 async function geocodificarDireccion(dir) {
-  // Proxy a través del backend para evitar bloqueos CORS del navegador
+  // Proxy a través del backend para evitar bloqueos CORS del navegador.
+  // Espera >=1.1s entre peticiones sucesivas (política de Nominatim: máx. 1/seg).
+  let _ultimaPeticion = 0;
+  const esperarTurno = async () => {
+    const ahora = Date.now();
+    const faltan = 1100 - (ahora - _ultimaPeticion);
+    if (_ultimaPeticion && faltan > 0) await new Promise(r => setTimeout(r, faltan));
+    _ultimaPeticion = Date.now();
+  };
   const fetchN = async (params) => {
+    await esperarTurno();
     const endpoint = Object.keys(params).some(k => ['street','postalcode','city','country'].includes(k))
       ? '/api/geocode/structured?' + new URLSearchParams(params)
       : '/api/geocode?' + new URLSearchParams({ q: Object.values(params)[0] });
@@ -4334,8 +4343,7 @@ async function geocodificarDireccion(dir) {
   }
 
   // Intento 4: query libre como último recurso
-  const r = await fetch('/api/geocode?' + new URLSearchParams({ q: dirN + ', España' }), { credentials: 'include' });
-  const dl = await r.json();
+  const dl = await fetchN({ q: dirN + ', España' });
   if (dl && dl.length > 0) return { lat: parseFloat(dl[0].lat), lon: parseFloat(dl[0].lon) };
 
   return null;
