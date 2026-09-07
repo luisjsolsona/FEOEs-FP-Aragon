@@ -78,6 +78,7 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_estancias_alumno        ON estancias(alumno_id);
   CREATE INDEX IF NOT EXISTS idx_estancias_empresa       ON estancias(empresa_id);
   CREATE INDEX IF NOT EXISTS idx_estancias_curso         ON estancias(curso);
+  CREATE INDEX IF NOT EXISTS idx_estancias_alu_curso_per  ON estancias(alumno_id, curso, periodo_ini);
   CREATE INDEX IF NOT EXISTS idx_estancias_deleted       ON estancias(deleted);
   CREATE INDEX IF NOT EXISTS idx_estancias_delete_pend   ON estancias(delete_pending);
   CREATE INDEX IF NOT EXISTS idx_seguimientos_est        ON seguimientos(estancia_id);
