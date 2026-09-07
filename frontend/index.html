@@ -814,14 +814,6 @@ window.addEventListener('unhandledrejection', function(e) {
       </button>
       <div id="menuDatos" style="display:none;position:absolute;right:0;top:calc(100% + 6px);background:white;border:1px solid var(--gray5);border-radius:10px;box-shadow:var(--shadow-lg);min-width:260px;z-index:500;overflow:hidden">
 
-        <!-- Guardado local -->
-        <div style="padding:7px 14px 4px;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--gray4)">Guardado local</div>
-        <button class="menu-item" onclick="cargarDatos().then(()=>{toast('Datos recargados','success');cerrarMenuDatos();})">
-          <span style="width:20px;text-align:center">💾</span> Guardar ahora
-        </button>
-
-        <div style="height:1px;background:var(--gray6);margin:4px 0"></div>
-
         <!-- Copia de seguridad — solo admin -->
         <div id="menuDatosCopiaSeguridad">
           <div style="padding:7px 14px 4px;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--gray4)">Copia de seguridad</div>
@@ -3294,6 +3286,29 @@ async function restaurarBackupJSON(evt) {
   reader.readAsText(file);
 }
 
+// Una fila por estancia (relación alumno↔empresa), aplicando los mismos filtros
+// que la tabla de Alumnado (búsqueda, curso, nivel, empresa, año), para que lo
+// exportado coincida con lo que se está viendo en pantalla en ese momento.
+function getEstanciasFiltradas() {
+  const q        = (document.getElementById('searchInput')?.value  || '').toLowerCase();
+  const fCurso   = document.getElementById('filterCurso')?.value   || '';
+  const fNivel   = document.getElementById('filterNivel')?.value   || '';
+  const fEmpresa = document.getElementById('filterEmpresa')?.value || '';
+  const fAnio    = document.getElementById('filterAnio')?.value    || '';
+
+  return state.estancias.filter(e => !e.deleted).map(e => {
+    const a = state.alumnado.find(x => x.id === e.alumnoId) || {};
+    return { ...e, alumnoId: e.alumnoId, apellidos: a.apellidos||'', nombre: a.nombre||'', dni: a.dni||'', familia: a.familia||'' };
+  }).filter(r => {
+    const txt = `${r.apellidos} ${r.nombre} ${r.dni} ${r.curso} ${r.nivel||''} ${r.empresaNombre||''} ${r.empresaCif||''} ${r.obsAlumno||''}`.toLowerCase();
+    return (!q       || txt.includes(q))
+      && (!fCurso    || r.curso === fCurso)
+      && (!fNivel    || (r.nivel||'') === fNivel)
+      && (!fEmpresa  || r.empresaNombre === fEmpresa)
+      && (!fAnio     || (r.periodoIni||'').startsWith(fAnio));
+  });
+}
+
 function exportarExcel() {
   cerrarMenuDatos();
   const data=getEstanciasFiltradas();
@@ -3319,14 +3334,33 @@ function exportarEmpresasExcel() {
   const q=(document.getElementById('searchEmpresa')?.value||'').toLowerCase();
   const data=state.empresas.filter(e=>!e.deleted);
   const filtradas=q?data.filter(e=>(e.nombre+' '+e.cif).toLowerCase().includes(q)):data;
+  const idsFiltradas = new Set(filtradas.map(e=>e.id));
+
   const rows=[['ID','Nombre','CIF','Sector','Direccion','Contacto','Cargo','Telefono','Email','Obs','N Estancias'],
     ...filtradas.map(e=>[e.id,e.nombre,e.cif,e.sector,e.direccion,e.contactoNombre,e.contactoCargo,e.contactoTel,e.contactoEmail,e.obs,
       state.estancias.filter(s=>!s.deleted&&(s.empresaId===e.id||(!s.empresaId&&s.empresaCif===e.cif))).length])];
-  const wb=XLSX.utils.book_new(),ws=XLSX.utils.aoa_to_sheet(rows);
+
+  // Hoja 2: relación alumno–empresa (una fila por estancia) de las empresas exportadas
+  const relacion = state.estancias.filter(s => !s.deleted && (idsFiltradas.has(s.empresaId) || filtradas.some(e=>!s.empresaId && s.empresaCif===e.cif)))
+    .map(s => {
+      const emp = filtradas.find(e => e.id === s.empresaId || (!s.empresaId && s.empresaCif === e.cif));
+      const al  = state.alumnado.find(a => a.id === s.alumnoId);
+      return [emp?.nombre||s.empresaNombre||'', emp?.cif||s.empresaCif||'', al?.apellidos||'', al?.nombre||'', al?.dni||'',
+        s.curso, s.nivel||'', s.periodoIni||'', s.periodoFin||'', s.contacto||'', s.obsEmpresa||'', s.obsAlumno||''];
+    });
+  const rowsRelacion = [['Empresa','CIF','Apellidos Alumno','Nombre Alumno','DNI','Curso','Nivel','Periodo Inicio','Periodo Fin','Contacto','Obs. Empresa','Obs. Alumno'], ...relacion];
+
+  const wb=XLSX.utils.book_new();
+  const ws=XLSX.utils.aoa_to_sheet(rows);
   ws['!cols']=[4,30,12,20,35,20,20,14,30,40,8].map(w=>({wch:w}));
   XLSX.utils.book_append_sheet(wb,ws,'Empresas_FEOE');
+
+  const ws2=XLSX.utils.aoa_to_sheet(rowsRelacion);
+  ws2['!cols']=[30,12,18,14,12,11,8,13,13,24,30,30].map(w=>({wch:w}));
+  XLSX.utils.book_append_sheet(wb,ws2,'Relacion_Alumnos_Empresa');
+
   XLSX.writeFile(wb,'FEOE_empresas_'+new Date().toISOString().slice(0,10)+'.xlsx');
-  toast('Excel exportado: '+filtradas.length+' empresas','success');
+  toast('Excel exportado: '+filtradas.length+' empresas, '+relacion.length+' estancias','success');
 }
 async function borrarTodosLosDatos() {
   cerrarMenuDatos();
