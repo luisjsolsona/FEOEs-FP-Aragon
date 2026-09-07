@@ -45,6 +45,7 @@ const Empresas = {
   create: (body)   => window.apiFetch('/empresas',       { method: 'POST',   body }),
   update: (id, b)  => window.apiFetch(`/empresas/${id}`, { method: 'PUT',    body: b }),
   delete: (id)     => window.apiFetch(`/empresas/${id}`, { method: 'DELETE' }),
+  prospeccion: (id, b) => window.apiFetch(`/empresas/${id}/prospeccion`, { method: 'PUT', body: b }),
 };
 
 const Alumnado = {
@@ -928,7 +929,9 @@ window.addEventListener('unhandledrejection', function(e) {
           <tr>
             <th id="thCheckAll" style="width:32px;padding:10px 8px 10px 14px" title="Seleccionar todos"><input type="checkbox" class="cb-row" id="cbAll" onclick="toggleSelAll(this)" style="display:none"></th>
             <th onclick="sortBy('id')" class="mono" style="width:40px">#<span class="sort-arrow">↕</span></th>
-            <th onclick="sortBy('apellidos')">Alumno / DNI<span class="sort-arrow">↕</span></th>
+            <th onclick="sortBy('apellidos')">Apellidos<span class="sort-arrow">↕</span></th>
+            <th onclick="sortBy('nombre')">Nombre<span class="sort-arrow">↕</span></th>
+            <th class="hide-mobile mono">DNI</th>
             <th onclick="sortBy('curso')" style="min-width:110px">Curso / Nivel<span class="sort-arrow">↕</span></th>
             <th onclick="sortBy('empresa')">Empresa</th>
             <th class="hide-mobile">Periodo</th>
@@ -2161,10 +2164,9 @@ function renderTabla() {
     <tr class="${sel?'selected-row':''}" style="cursor:pointer" onclick="abrirPanelAlumnoEstancias(${f.id})">
       <td style="padding:8px 8px 8px 14px;width:32px" onclick="event.stopPropagation()">${canValidate()?`<input type="checkbox" class="cb-row" data-id="${f.id}" ${sel?'checked':''} onclick="toggleSelRow(${f.id},this)">`:'&nbsp;'}</td>
       <td class="mono" style="color:var(--gray4);width:40px">${String(f.id).padStart(3,'0')}</td>
-      <td style="min-width:160px">
-        <div class="cell-name">${escHtml(f.apellidos)}, ${escHtml(f.nombre)}</div>
-        <div class="mono" style="font-size:11px;color:var(--gray4)">${escHtml(f.dni)}</div>
-      </td>
+      <td style="min-width:110px" class="cell-name">${escHtml(f.apellidos)}</td>
+      <td style="min-width:110px" class="cell-name">${escHtml(f.nombre)}</td>
+      <td class="hide-mobile mono" style="font-size:11px;color:var(--gray4)">${escHtml(f.dni)}</td>
       <td style="min-width:110px">
         ${u?`<span class="badge badge-curso" style="display:inline-block;margin-bottom:3px">${escHtml(u.curso)}</span>
              <span class="badge" style="display:inline-block;background:${NB[u.nivel]||'var(--gray6)'};color:${NC[u.nivel]||'var(--gray3)'}">${escHtml(u.nivel)||'—'}</span>`
@@ -2577,6 +2579,32 @@ function abrirPanelEmpresa(id) {
   document.getElementById('overlayEmpresa')?.classList.add('open');
 }
 
+const PROSPECCION_INFO = {
+  sin_contactar: { label: 'Sin contactar', icon: '⚪', color: 'var(--gray4)',  bg: 'var(--gray7)' },
+  llamado:       { label: 'Llamado',       icon: '📞', color: '#0057B8',      bg: '#E6F0FB' },
+  pendiente:     { label: 'Pendiente contacto', icon: '⏳', color: '#8B6000', bg: '#FFF4E0' },
+  ok:            { label: 'OK / Interesada', icon: '✅', color: '#1A7A3C',  bg: '#E6F4ED' },
+  rechazada:     { label: 'Rechazada',     icon: '✖️', color: '#CC2200',     bg: '#FDECEA' },
+};
+
+async function marcarProspeccion(empresaId, estado) {
+  try {
+    const r = await Empresas.prospeccion(empresaId, { estado });
+    const emp = state.empresas.find(e => e.id === empresaId);
+    if (emp) { emp.prospeccionEstado = r.prospeccion_estado; emp.prospeccionFecha = r.prospeccion_fecha; emp.prospeccionContacto = r.prospeccion_contacto; }
+    renderEmpresas();
+    toast('Prospección actualizada: '+(PROSPECCION_INFO[estado]?.label||estado),'success');
+  } catch(err) { toast('Error: '+err.message,'error'); }
+}
+
+function guardarNotaProspeccion(empresaId, textarea) {
+  const notas = textarea.value.trim();
+  Empresas.prospeccion(empresaId, { notas }).then(r => {
+    const emp = state.empresas.find(e => e.id === empresaId);
+    if (emp) { emp.prospeccionNotas = notas; emp.prospeccionFecha = r.prospeccion_fecha; emp.prospeccionContacto = r.prospeccion_contacto; }
+  }).catch(err => toast('Error al guardar la nota: '+err.message,'error'));
+}
+
 function renderEmpresas() {
   const q = (document.getElementById('searchEmpresa')?.value || '').toLowerCase();
   const container = document.getElementById('empresasContainer');
@@ -2590,9 +2618,12 @@ function renderEmpresas() {
     return;
   }
 
+  const cursoActual = cursoActualAcademico();
+
   container.innerHTML = empresas.map(e => {
     // Agrupar estancias de esta empresa por curso
     const ests = state.estancias.filter(s => !s.deleted && (s.empresaId === e.id || (!s.empresaId && s.empresaCif && s.empresaCif === e.cif)));
+    const tieneEstanciaActiva = ests.some(s => s.curso === cursoActual);
     const byYear = {};
     ests.forEach(s => {
       const a = state.alumnado.find(x=>x.id===s.alumnoId && !x.deleted);
@@ -2613,23 +2644,49 @@ function renderEmpresas() {
       mapaBadge = `<span title="Sin dirección — no puede mostrarse en el mapa. Edita la ficha." style="display:inline-flex;align-items:center;gap:3px;background:#FDECEA;color:#CC2200;border-radius:20px;padding:2px 8px;font-size:11px;font-weight:600;cursor:pointer" onclick="event.stopPropagation();abrirPanelEmpresa(${e.id})">⚠️ Sin dirección</span>`;
     }
 
+    const estadoInfo = PROSPECCION_INFO[e.prospeccionEstado] || PROSPECCION_INFO.sin_contactar;
+
     return `
     <div class="empresa-card">
       <div class="empresa-card-header" onclick="toggleEmpCard(${e.id})">
         <div>
           <div class="empresa-name">🏢 ${escHtml(e.nombre)}</div>
           <div class="empresa-meta mono">${escHtml(e.cif)}${e.sector ? ` · ${escHtml(e.sector)}` : ''}${e.direccion ? ` · ${escHtml(e.direccion)}` : '<span style="color:var(--red)"> · Sin dirección</span>'}</div>
-          ${e.contactoNombre ? `<div class="empresa-meta">👤 ${escHtml(e.contactoNombre)}${e.contactoCargo?' ('+escHtml(e.contactoCargo)+')':''}${e.contactoTel?' · '+escHtml(e.contactoTel):''}</div>` : ''}
+          <div class="empresa-meta" style="margin-top:3px">
+            ${e.contactoNombre ? `👤 ${escHtml(e.contactoNombre)}${e.contactoCargo?' ('+escHtml(e.contactoCargo)+')':''}` : ''}
+            ${e.contactoTel ? `<a href="tel:${esc(e.contactoTel)}" onclick="event.stopPropagation()" style="margin-left:8px;font-weight:700;color:var(--az);font-size:14px">📞 ${escHtml(e.contactoTel)}</a>` : ''}
+          </div>
         </div>
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end">
           ${mapaBadge}
-          <span class="badge badge-curso">${ests.length} estancias</span>
-          <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation();abrirPanelEmpresa(${e.id})">✏️ Editar</button>
-          ${isAdmin() ? `<button class="btn btn-sm btn-ghost" style="color:var(--red)" onclick="event.stopPropagation();solicitarEliminar('empresa',${e.id},'${esc(e.nombre)}')">🗑 Borrar</button>` : ''}
+          <span title="${estadoInfo.label}" style="display:inline-flex;align-items:center;gap:4px;background:${estadoInfo.bg};color:${estadoInfo.color};border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700">${estadoInfo.icon} ${estadoInfo.label}</span>
+          ${tieneEstanciaActiva ? `<span title="Tiene alumnado en estancia formativa este curso" style="font-size:26px;line-height:1">🧑‍🎓</span>` : ''}
+          <span class="badge badge-curso">${ests.length} estancia${ests.length!==1?'s':''}</span>
+          <button class="btn btn-secondary" style="padding:10px 16px;font-size:14px" onclick="event.stopPropagation();abrirPanelEmpresa(${e.id})">✏️ Editar</button>
+          ${isAdmin() ? `<button class="btn btn-ghost" style="padding:10px 16px;font-size:14px;color:var(--red)" onclick="event.stopPropagation();solicitarEliminar('empresa',${e.id},'${esc(e.nombre)}')">🗑 Borrar</button>` : ''}
         </div>
       </div>
       <div class="empresa-card-body" id="empcard-${e.id}" style="display:none">
         ${e.obs ? `<div style="padding:10px 14px;font-size:12px;color:var(--gray2);background:var(--gold-light);border-bottom:var(--border)">📝 ${escHtml(e.obs)}</div>` : ''}
+
+        <!-- Prospección -->
+        <div style="padding:12px 14px;border-bottom:var(--border);background:var(--gray7)">
+          <div style="font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--gray3);margin-bottom:8px">📋 Prospección</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
+            ${Object.entries(PROSPECCION_INFO).map(([key,info]) => `
+              <button type="button" onclick="event.stopPropagation();marcarProspeccion(${e.id},'${key}')"
+                style="display:inline-flex;align-items:center;gap:4px;border-radius:20px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;
+                  border:1.5px solid ${key===e.prospeccionEstado?info.color:'var(--gray5)'};
+                  background:${key===e.prospeccionEstado?info.bg:'white'};color:${key===e.prospeccionEstado?info.color:'var(--gray3)'}">
+                ${info.icon} ${info.label}
+              </button>`).join('')}
+          </div>
+          ${e.prospeccionFecha ? `<div style="font-size:11px;color:var(--gray4);margin-bottom:8px">Última gestión: ${formatFecha(e.prospeccionFecha)} · ${escHtml(e.prospeccionContacto||'—')}</div>` : ''}
+          <textarea placeholder="Notas de la prospección: quién ha llamado, qué se ha hablado, próximos pasos…"
+            style="min-height:60px;font-size:12px" onclick="event.stopPropagation()"
+            onblur="guardarNotaProspeccion(${e.id},this)">${escHtml(e.prospeccionNotas||'')}</textarea>
+        </div>
+
         ${Object.keys(byYear).sort().reverse().map(curso => `
           <div style="padding:8px 14px;font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--gray3);background:var(--gray7);border-bottom:var(--border)">
             Curso ${curso}
@@ -3358,7 +3415,7 @@ async function cargarDatos() {
   try {
     const [{alumnado},{empresas},{pendientes},{historial}]=await Promise.all([Alumnado.list(),Empresas.list(),Pendientes.list(),Historial.list()]);
     state.alumnado=alumnado.map(a=>({id:a.id,apellidos:a.apellidos,nombre:a.nombre,dni:a.dni,familia:a.familia||'',obs:a.obs||'',fechaNacimiento:a.fecha_nacimiento||'',telefono1:a.telefono1||'',telefono2:a.telefono2||'',deleted:!!a.deleted,estancias:(a.estancias||[]).map(normalizarEstancia)}));
-    state.empresas=empresas.map(e=>({id:e.id,nombre:e.nombre,cif:e.cif,sector:e.sector||'',direccion:e.direccion||'',lat:e.lat||null,lon:e.lon||null,contactoNombre:e.contacto_nombre||'',contactoCargo:e.contacto_cargo||'',contactoTel:e.contacto_tel||'',contactoEmail:e.contacto_email||'',obs:e.obs||'',deleted:!!e.deleted}));
+    state.empresas=empresas.map(e=>({id:e.id,nombre:e.nombre,cif:e.cif,sector:e.sector||'',direccion:e.direccion||'',lat:e.lat||null,lon:e.lon||null,contactoNombre:e.contacto_nombre||'',contactoCargo:e.contacto_cargo||'',contactoTel:e.contacto_tel||'',contactoEmail:e.contacto_email||'',obs:e.obs||'',prospeccionEstado:e.prospeccion_estado||'sin_contactar',prospeccionFecha:e.prospeccion_fecha||'',prospeccionContacto:e.prospeccion_contacto||'',prospeccionNotas:e.prospeccion_notas||'',deleted:!!e.deleted}));
     state.pendientes=pendientes.map(p=>({id:p.id,tipo:p.tipo,refId:p.ref_id,nombre:p.nombre,solicitante:p.solicitante,fecha:p.created_at,resuelto:!!p.resuelto,aprobado:p.aprobado}));
     state.historial=historial.map(h=>({id:h.id,tipo:h.tipo,texto:h.texto,usuario:h.usuario,fecha:h.created_at}));
     state.empresas.forEach(e=>{if(e.lat&&e.lon) geocacheMap[e.cif]={lat:e.lat,lon:e.lon};});

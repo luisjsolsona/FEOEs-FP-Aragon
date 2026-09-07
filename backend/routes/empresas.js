@@ -64,6 +64,25 @@ router.put('/:id', requireProfe, (req, res) => {
   res.json({ ok: true });
 });
 
+// PUT /api/empresas/:id/prospeccion — marcar estado de prospección (llamado/pendiente/ok/rechazada/sin_contactar)
+const ESTADOS_PROSPECCION = ['sin_contactar', 'llamado', 'pendiente', 'ok', 'rechazada'];
+router.put('/:id/prospeccion', requireProfe, (req, res) => {
+  const id = parseInt(req.params.id);
+  const e = db.prepare('SELECT * FROM empresas WHERE id = ?').get(id);
+  if (!e) return res.status(404).json({ error: 'Empresa no encontrada.' });
+
+  const { estado, notas } = req.body;
+  if (estado !== undefined && !ESTADOS_PROSPECCION.includes(estado)) {
+    return res.status(400).json({ error: 'Estado de prospección inválido.' });
+  }
+  const contacto = req.user.nombre || req.user.role;
+  const fecha = new Date().toISOString().slice(0, 10);
+
+  db.prepare(`UPDATE empresas SET prospeccion_estado=?, prospeccion_fecha=?, prospeccion_contacto=?, prospeccion_notas=?, updated_at=datetime('now') WHERE id=?`)
+    .run(estado ?? e.prospeccion_estado, fecha, contacto, notas ?? e.prospeccion_notas, id);
+  res.json({ ok: true, prospeccion_estado: estado ?? e.prospeccion_estado, prospeccion_fecha: fecha, prospeccion_contacto: contacto });
+});
+
 // DELETE /api/empresas/:id — solo admin
 router.delete('/:id', requireAdmin, (req, res) => {
   db.prepare(`UPDATE empresas SET deleted=1, updated_at=datetime('now') WHERE id=?`).run(parseInt(req.params.id));
