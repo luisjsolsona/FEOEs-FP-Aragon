@@ -1533,7 +1533,15 @@ window.addEventListener('unhandledrejection', function(e) {
         </div>
         <div class="form-row">
           <div class="form-group" style="position:relative">
-            <label>Dirección <span style="font-size:12px;font-weight:400;color:var(--gray3)">— busca y selecciona de OpenStreetMap</span></label>
+            <label style="display:flex;align-items:center;gap:6px">
+              Dirección <span style="font-size:12px;font-weight:400;color:var(--gray3)">— busca y selecciona de OpenStreetMap</span>
+              <span tabindex="0" style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:var(--gray6);color:var(--gray2);font-size:11px;font-weight:700;cursor:help;position:relative" onmouseover="this.querySelector('.tip').style.display='block'" onmouseout="this.querySelector('.tip').style.display='none'">
+                ?
+                <span class="tip" style="display:none;position:absolute;left:50%;top:120%;transform:translateX(-50%);background:var(--az);color:white;font-weight:400;font-size:11px;line-height:1.4;padding:8px 10px;border-radius:6px;width:240px;z-index:100;box-shadow:var(--shadow-lg)">
+                  Escribe <b>solo calle, número y ciudad</b> (ej. "Eugenio Lucas 14, Zaragoza") — sin "C/", sin el nombre de la empresa y sin el código postal delante. Elige siempre una opción de la lista para que quede geolocalizada; si escribes y no eliges ninguna, no se guardan coordenadas. Si da error de "demasiadas peticiones", espera unos segundos y prueba de nuevo.
+                </span>
+              </span>
+            </label>
             <div style="position:relative">
               <input type="text" id="eDireccion" placeholder="Escribe calle, número y ciudad…"
                      oninput="buscarDireccionAuto()" autocomplete="off"
@@ -1983,32 +1991,36 @@ function buscarDireccionAuto() {
 
   _geoSugTimer = setTimeout(async () => {
     const q = val + ', España';
-    const qs = new URLSearchParams({ q, format: 'json', limit: '6', countrycodes: 'es', addressdetails: '1' });
 
-    // Intenta obtener resultados: primero directo a Nominatim (sin cabeceras extra),
-    // si falla (CORS / red) usa el proxy del backend.
+    // Todo pasa por el proxy del backend: es el único que identifica la app con un
+    // User-Agent válido y respeta el límite de Nominatim (1 petición/seg desde la
+    // IP del servidor). Llamar a Nominatim directamente desde el navegador usa la
+    // IP del centro (compartida por todo el profesorado) sin User-Agent válido, y
+    // es lo que provocaba los errores 429/502 al escribir una dirección.
     let data = null;
     let errMsg = '';
-    try {
-      const r = await fetch('https://nominatim.openstreetmap.org/search?' + qs);
+    const intentar = async () => {
+      const r = await fetch('/api/geocode?' + new URLSearchParams({ q }), { credentials: 'include' });
       if (!r.ok) throw new Error('HTTP ' + r.status);
-      data = await r.json();
+      return r.json();
+    };
+    try {
+      data = await intentar();
     } catch (e1) {
       errMsg = e1.message;
-      try {
-        const r2 = await fetch('/api/geocode?' + new URLSearchParams({ q }), { credentials: 'include' });
-        if (!r2.ok) throw new Error('proxy HTTP ' + r2.status);
-        data = await r2.json();
-        errMsg = '';
-      } catch (e2) {
-        errMsg += ' · proxy: ' + e2.message;
-      }
+      // Un solo reintento tras una pequeña espera, por si ha sido un fallo puntual
+      await new Promise(res => setTimeout(res, 1200));
+      try { data = await intentar(); errMsg = ''; }
+      catch (e2) { errMsg = e2.message; }
     }
 
     if (!Array.isArray(data) || !data.length) {
+      const motivo = errMsg
+        ? (errMsg.includes('429') ? 'Nominatim está saturado ahora mismo (demasiadas peticiones). Espera unos segundos y vuelve a intentarlo.'
+           : `Error de conexión con el servicio de mapas (${errMsg}).`)
+        : 'No se ha encontrado esa dirección.';
       sug.innerHTML = `<div style="padding:10px 12px;font-size:12px;color:var(--gray3)">
-        Sin resultados${errMsg ? ' <span style="color:var(--red);font-size:10px">('+escHtml(errMsg)+')</span>' : ''}.
-        Prueba solo con el nombre de la calle y la ciudad.
+        ${motivo}<br>Prueba solo con el nombre de la calle y la ciudad (sin el número, sin "C/", sin el nombre de la empresa).
       </div>`;
       return;
     }

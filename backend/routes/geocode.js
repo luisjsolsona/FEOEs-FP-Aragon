@@ -13,7 +13,7 @@ router.get('/', requireAuth, async (req, res) => {
 
   try {
     const url = `https://nominatim.openstreetmap.org/search?${new URLSearchParams({
-      q, format: 'json', limit: '3', countrycodes: 'es', addressdetails: '1',
+      q, format: 'json', limit: '6', countrycodes: 'es', addressdetails: '1',
     })}`;
     const resp = await fetch(url, {
       headers: { 'User-Agent': ua, 'Accept-Language': 'es' },
