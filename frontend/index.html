@@ -897,9 +897,6 @@ window.addEventListener('unhandledrejection', function(e) {
       <select class="filter-select" id="filterCurso" onchange="renderTabla()">
         <option value="">Todos los cursos</option>
       </select>
-      <select class="filter-select" id="filterFamilia" onchange="renderTabla()">
-        <option value="">Todas las familias</option>
-      </select>
       <select class="filter-select" id="filterNivel" onchange="renderTabla()">
         <option value="">Todos los niveles</option>
         <option value="1CFGB">1º CFGB</option>
@@ -932,7 +929,6 @@ window.addEventListener('unhandledrejection', function(e) {
             <th id="thCheckAll" style="width:32px;padding:10px 8px 10px 14px" title="Seleccionar todos"><input type="checkbox" class="cb-row" id="cbAll" onclick="toggleSelAll(this)" style="display:none"></th>
             <th onclick="sortBy('id')" class="mono" style="width:40px">#<span class="sort-arrow">↕</span></th>
             <th onclick="sortBy('apellidos')">Alumno / DNI<span class="sort-arrow">↕</span></th>
-            <th onclick="sortBy('familia')" class="hide-mobile">Familia Profesional<span class="sort-arrow">↕</span></th>
             <th onclick="sortBy('curso')" style="min-width:110px">Curso / Nivel<span class="sort-arrow">↕</span></th>
             <th onclick="sortBy('empresa')">Empresa</th>
             <th class="hide-mobile">Periodo</th>
@@ -1219,7 +1215,6 @@ window.addEventListener('unhandledrejection', function(e) {
 
       <!-- DATOS PERSONALES -->
       <div class="form-section" id="seccionDatosPersonales">
-        <div class="form-section-title">📋 Datos personales</div>
         <div class="form-row col2">
           <div class="form-group">
             <label>Apellidos *</label>
@@ -1236,26 +1231,21 @@ window.addEventListener('unhandledrejection', function(e) {
             <input type="text" id="aDni" placeholder="12345678A" class="mono" oninput="autoGuardarAlumno()">
           </div>
           <div class="form-group">
-            <label>Familia Profesional</label>
-            <select id="aFamilia" onchange="cambioFamilia()">
-              <option value="">Selecciona…</option>
-              <option>INFORMÁTICA Y COMUNICACIONES</option>
-              <option>ADMINISTRACIÓN Y GESTIÓN</option>
-              <option>COMERCIO Y MARKETING</option>
-              <option>ELECTRICIDAD Y ELECTRÓNICA</option>
-              <option>INSTALACIÓN Y MANTENIMIENTO</option>
-              <option>SANIDAD</option>
-              <option>SERVICIOS SOCIOCULTURALES</option>
-              <option>HOSTELERÍA Y TURISMO</option>
-              <option>EDIFICACIÓN Y OBRA CIVIL</option>
-              <option>FABRICACIÓN MECÁNICA</option>
-              <option>TRANSPORTE Y MANTENIMIENTO DE VEHÍCULOS</option>
-              <option>AGRARIA</option>
-              <option>IMAGEN PERSONAL</option>
-              <option>ARTES GRÁFICAS</option>
-              <option>QUÍMICA</option>
-              <option>OTRA</option>
-            </select>
+            <label>Fecha de nacimiento</label>
+            <div style="display:flex;align-items:center;gap:10px">
+              <input type="date" id="aFechaNacimiento" oninput="actualizarEdadAlumno();autoGuardarAlumno()" style="flex:1">
+              <span id="aEdadAlumno" class="mono" style="font-size:12px;color:var(--gray3);white-space:nowrap"></span>
+            </div>
+          </div>
+        </div>
+        <div class="form-row col2">
+          <div class="form-group">
+            <label>Teléfono de contacto 1</label>
+            <input type="text" id="aTelefono1" placeholder="600 000 000" class="mono" oninput="autoGuardarAlumno()">
+          </div>
+          <div class="form-group">
+            <label>Teléfono de contacto 2</label>
+            <input type="text" id="aTelefono2" placeholder="600 000 000" class="mono" oninput="autoGuardarAlumno()">
           </div>
         </div>
         <div class="form-row" style="margin-top:10px">
@@ -1263,6 +1253,10 @@ window.addEventListener('unhandledrejection', function(e) {
             <label>Observaciones personales del alumno/a</label>
             <textarea id="aObsPersonal" placeholder="Notas personales, circunstancias a tener en cuenta…" style="min-height:80px" oninput="autoGuardarAlumno()"></textarea>
           </div>
+        </div>
+        <div class="form-row" style="margin-top:12px;gap:8px">
+          <a href="https://aplicaciones.aragon.es/sigaddweb/login" target="_blank" rel="noopener" class="btn btn-sm btn-secondary">🔗 SIGAD Didáctica</a>
+          <a href="https://servicios.aragon.es/sigad-academica" target="_blank" rel="noopener" class="btn btn-sm btn-secondary">🔗 SIGAD Académica</a>
         </div>
       </div>
 
@@ -1324,28 +1318,25 @@ window.addEventListener('unhandledrejection', function(e) {
         </div>
 
         <!-- Empresa destacada -->
-        <div style="background:var(--az);border-radius:8px;padding:12px 16px;margin-bottom:12px">
-          <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.6);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:8px">Empresa</div>
+        <div style="border:1.5px solid var(--az);border-radius:8px;padding:12px 16px;margin-bottom:12px;background:white">
+          <div style="font-size:11px;font-weight:700;color:var(--az);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:8px">🏢 Empresa</div>
           <div class="form-row" style="margin-bottom:8px">
             <div class="form-group">
               <input type="text" id="aEmpresaBuscador" placeholder="🔍 Buscar empresa por nombre o CIF…" oninput="filtrarSelectEmpresa()"
-                style="background:rgba(255,255,255,0.12);color:white;border:1px solid rgba(255,255,255,0.25);font-size:13px;margin-bottom:6px">
-              <select id="aEmpresa" onchange="autocompletarEmpresa();autoGuardarEstancia()"
-                style="background:rgba(255,255,255,0.12);color:white;border:1px solid rgba(255,255,255,0.25);font-size:13px">
-                <option value="" style="color:var(--gray1)">— Seleccionar empresa registrada —</option>
+                style="font-size:13px;margin-bottom:6px">
+              <select id="aEmpresa" onchange="autocompletarEmpresa();autoGuardarEstancia()" style="font-size:13px">
+                <option value="">— Seleccionar empresa registrada —</option>
               </select>
             </div>
           </div>
           <div class="form-row col2" style="margin-bottom:0">
             <div class="form-group">
-              <label style="color:rgba(255,255,255,0.7);font-size:11px">Nombre empresa</label>
-              <input type="text" id="aEmpresaNombre" placeholder="Empresa S.L." oninput="autoGuardarEstancia()"
-                style="background:rgba(255,255,255,0.12);color:white;border:1px solid rgba(255,255,255,0.2);font-size:13px">
+              <label>Nombre empresa</label>
+              <input type="text" id="aEmpresaNombre" placeholder="Empresa S.L." oninput="autoGuardarEstancia()" style="font-size:13px">
             </div>
             <div class="form-group">
-              <label style="color:rgba(255,255,255,0.7);font-size:11px">CIF</label>
-              <input type="text" id="aEmpresaCif" placeholder="B12345678" class="mono" oninput="autoGuardarEstancia()"
-                style="background:rgba(255,255,255,0.12);color:white;border:1px solid rgba(255,255,255,0.2);font-size:13px">
+              <label>CIF</label>
+              <input type="text" id="aEmpresaCif" placeholder="B12345678" class="mono" oninput="autoGuardarEstancia()" style="font-size:13px">
             </div>
           </div>
         </div>
@@ -1402,9 +1393,12 @@ window.addEventListener('unhandledrejection', function(e) {
 
         <!-- Seguimiento de visitas -->
         <div id="seguimientosContainer" style="display:none;border-top:1px solid rgba(200,168,75,0.3);padding-top:14px;margin-top:6px">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-            <div style="font-family:'Crimson Pro',serif;font-size:15px;font-weight:600;color:var(--az)">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px;flex-wrap:wrap">
+            <div style="font-family:'Crimson Pro',serif;font-size:15px;font-weight:600;color:var(--az);display:flex;align-items:center;gap:6px">
               📋 Seguimiento de visitas
+              <button type="button" class="btn btn-sm btn-ghost" title="RELLENAR el documento: JUSTIFICANTE VISITA PRÁCTICAS y entregar en JEFATURA"
+                onclick="toast('RELLENAR el documento: JUSTIFICANTE VISITA PRÁCTICAS y entregar en JEFATURA','info')"
+                style="width:22px;height:22px;padding:0;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:13px;color:var(--az);background:rgba(0,61,165,0.08)">ℹ️</button>
             </div>
             <button class="btn btn-sm btn-secondary" onclick="abrirFormSeguimiento(null)" id="btnNuevaSeguimiento">+ Nueva visita</button>
           </div>
@@ -1673,9 +1667,9 @@ function generarOpcionesCurso(selectEl, seleccionado) {
   if (!selectEl) return;
   const actual = cursoActualAcademico();
   const yActualIni = parseInt(actual.split('-')[0]);
+  const FLOOR = 2025; // no se muestran cursos anteriores a 2025-2026
   const opciones = [];
-  for (let offset = 1; offset >= -5; offset--) {
-    const ini = yActualIni + offset;
+  for (let ini = yActualIni + 1; ini >= FLOOR; ini--) {
     opciones.push(`${ini}-${ini+1}`);
   }
   if (seleccionado && !opciones.includes(seleccionado)) opciones.unshift(seleccionado);
@@ -1711,7 +1705,6 @@ function _manejarSeleccionEditable(selectId, callbackGuardar) {
   callbackGuardar();
 }
 
-function cambioFamilia() { _manejarSeleccionEditable('aFamilia', autoGuardarAlumno); }
 function cambioCurso()   { _manejarSeleccionEditable('aCurso',   autoGuardarEstancia); }
 function cambioNivel()   { _manejarSeleccionEditable('aNivel',   autoGuardarEstancia); }
 
@@ -1727,6 +1720,22 @@ function filtrarSelectEmpresa() {
 }
 
 // ── Calculadora de días del periodo ──
+// ── Edad calculada a partir de la fecha de nacimiento ──
+function actualizarEdadAlumno() {
+  const el = document.getElementById('aEdadAlumno');
+  if (!el) return;
+  const val = document.getElementById('aFechaNacimiento').value;
+  if (!val) { el.textContent = ''; return; }
+  const nac = new Date(val + 'T00:00:00');
+  if (isNaN(nac)) { el.textContent = ''; return; }
+  const hoy = new Date();
+  let edad = hoy.getFullYear() - nac.getFullYear();
+  const noHaCumplidoAun = (hoy.getMonth() < nac.getMonth()) ||
+    (hoy.getMonth() === nac.getMonth() && hoy.getDate() < nac.getDate());
+  if (noHaCumplidoAun) edad--;
+  el.textContent = edad >= 0 ? `${edad} años` : '';
+}
+
 function actualizarDiasEstancia() {
   const el = document.getElementById('aDiasResumen');
   if (!el) return;
@@ -1816,8 +1825,10 @@ function autoGuardarAlumno() {
       apellidos: document.getElementById('aApellidos').value.trim(),
       nombre:    document.getElementById('aNombre').value.trim(),
       dni:       document.getElementById('aDni').value.trim(),
-      familia:   document.getElementById('aFamilia').value,
       obs:       document.getElementById('aObsPersonal').value.trim(),
+      fecha_nacimiento: document.getElementById('aFechaNacimiento').value,
+      telefono1: document.getElementById('aTelefono1').value.trim(),
+      telefono2: document.getElementById('aTelefono2').value.trim(),
     };
     if (!body.apellidos || !body.nombre || !body.dni) return;
     await Alumnado.update(id, body);
@@ -2058,7 +2069,6 @@ function renderStats() {
 function renderTabla() {
   const q        = (document.getElementById('searchInput')?.value  || '').toLowerCase();
   const fCurso   = document.getElementById('filterCurso')?.value   || '';
-  const fFamilia = document.getElementById('filterFamilia')?.value || '';
   const fNivel   = document.getElementById('filterNivel')?.value   || '';
   const fEmpresa = document.getElementById('filterEmpresa')?.value || '';
   const fAnio    = document.getElementById('filterAnio')?.value    || '';
@@ -2070,9 +2080,8 @@ function renderTabla() {
   });
 
   filas = filas.filter(f => {
-    const txt = `${f.apellidos} ${f.nombre} ${f.dni} ${f.familia||''} ${f.estancias.map(e=>`${e.curso} ${e.nivel||''} ${e.empresaNombre||''} ${e.empresaCif||''} ${e.obsAlumno||''}`).join(' ')}`.toLowerCase();
+    const txt = `${f.apellidos} ${f.nombre} ${f.dni} ${f.estancias.map(e=>`${e.curso} ${e.nivel||''} ${e.empresaNombre||''} ${e.empresaCif||''} ${e.obsAlumno||''}`).join(' ')}`.toLowerCase();
     return (!q       || txt.includes(q))
-      && (!fFamilia  || (f.familia||'') === fFamilia)
       && (!fCurso    || f.estancias.some(e=>e.curso===fCurso))
       && (!fNivel    || f.estancias.some(e=>(e.nivel||'')===fNivel))
       && (!fEmpresa  || f.estancias.some(e=>e.empresaNombre===fEmpresa))
@@ -2111,7 +2120,6 @@ function renderTabla() {
         <div class="cell-name">${escHtml(f.apellidos)}, ${escHtml(f.nombre)}</div>
         <div class="mono" style="font-size:11px;color:var(--gray4)">${escHtml(f.dni)}</div>
       </td>
-      <td class="hide-mobile" style="min-width:140px;font-size:11px;color:var(--gray3)">${escHtml(fS(f.familia))||'—'}</td>
       <td style="min-width:110px">
         ${u?`<span class="badge badge-curso" style="display:inline-block;margin-bottom:3px">${escHtml(u.curso)}</span>
              <span class="badge" style="display:inline-block;background:${NB[u.nivel]||'var(--gray6)'};color:${NC[u.nivel]||'var(--gray3)'}">${escHtml(u.nivel)||'—'}</span>`
@@ -2210,17 +2218,14 @@ function limpiarSeleccion() {
 
 function actualizarFiltros() {
   const estActivas = state.estancias.filter(e=>!e.deleted);
-  const alActivos  = state.alumnado.filter(a=>!a.deleted);
   const cursos   = [...new Set(estActivas.map(e=>e.curso))].sort().reverse();
-  const familias = [...new Set(alActivos.map(a=>a.familia||'').filter(Boolean))].sort();
   const empresas = [...new Set(estActivas.map(e=>e.empresaNombre).filter(Boolean))].sort();
   const anios    = [...new Set(estActivas.filter(e=>e.periodoIni).map(e=>e.periodoIni.substring(0,4)))].sort().reverse();
-  const selC=document.getElementById('filterCurso'), selF=document.getElementById('filterFamilia'),
+  const selC=document.getElementById('filterCurso'),
         selE=document.getElementById('filterEmpresa'), selA=document.getElementById('filterAnio');
   if (!selC) return;
-  const cv=selC.value,fv=selF?.value||'',ev=selE.value,av=selA.value;
+  const cv=selC.value,ev=selE.value,av=selA.value;
   selC.innerHTML = '<option value="">Todos los cursos</option>'   + cursos.map(c=>`<option ${c===cv?'selected':''}>${c}</option>`).join('');
-  if(selF) selF.innerHTML='<option value="">Todas las familias</option>'+familias.map(f=>`<option ${f===fv?'selected':''}>${f}</option>`).join('');
   selE.innerHTML = '<option value="">Todas las empresas</option>' + empresas.map(e=>`<option ${e===ev?'selected':''}>${e}</option>`).join('');
   selA.innerHTML = '<option value="">Todos los años</option>'     + anios.map(a=>`<option ${a===av?'selected':''}>${a}</option>`).join('');
 }
@@ -2238,6 +2243,7 @@ function abrirPanelAlumno(id, modo) {
   // modo: 'datos' | 'estancias' (omitido = nuevo alumno → siempre 'datos')
   const isNew = id === null;
   const modoEfectivo = isNew ? 'datos' : (modo || 'datos');
+  const a = isNew ? null : state.alumnado.find(x => x.id === id);
 
   const secDatos     = document.getElementById('seccionDatosPersonales');
   const secEstancias = document.getElementById('seccionEstancias');
@@ -2245,13 +2251,16 @@ function abrirPanelAlumno(id, modo) {
 
   if (modoEfectivo === 'datos') {
     document.getElementById('panelAlumnoTitle').textContent = isNew ? 'Nuevo alumno' : '📋 Datos personales';
-    document.getElementById('panelAlumnoSub').textContent   = isNew ? 'Rellena los datos del alumno/a' : 'Editar nombre, DNI y familia profesional';
+    document.getElementById('panelAlumnoSub').textContent   = isNew ? 'Rellena los datos del alumno/a' : 'Editar nombre, DNI, contacto y observaciones';
     secDatos.style.display     = 'block';
     secEstancias.style.display = 'none';
     if (btnGuardar) btnGuardar.style.display = '';
   } else {
-    document.getElementById('panelAlumnoTitle').textContent = '🏢 Estancias FEOE';
-    document.getElementById('panelAlumnoSub').textContent   = `Alumno #${String(id).padStart(3,'0')} — estancias y seguimientos`;
+    const ultimaEst = (a?.estancias||[]).filter(e=>!e.deleted).sort((x,y)=>(y.curso||'').localeCompare(x.curso||''))[0];
+    const telMostrar = a?.telefono1 || a?.telefono2 || '';
+    document.getElementById('panelAlumnoTitle').textContent = `🏢 ${a?.apellidos||''}, ${a?.nombre||''}`;
+    document.getElementById('panelAlumnoSub').textContent   =
+      [ultimaEst?.nivel, telMostrar ? `📞 ${telMostrar}` : null].filter(Boolean).join(' · ') || 'Estancias y seguimientos';
     secDatos.style.display     = 'none';
     secEstancias.style.display = 'block';
     if (btnGuardar) btnGuardar.style.display = 'none';
@@ -2267,24 +2276,25 @@ function abrirPanelAlumno(id, modo) {
 
   if (isNew) {
     document.getElementById('alumnoId').value = '';
-    ['aApellidos','aNombre','aDni'].forEach(f=>document.getElementById(f).value='');
-    document.getElementById('aFamilia').value = '';
+    ['aApellidos','aNombre','aDni','aFechaNacimiento','aTelefono1','aTelefono2'].forEach(f=>document.getElementById(f).value='');
     document.getElementById('aObsPersonal').value = '';
+    actualizarEdadAlumno();
     mostrarFormEstancia(null);
     _mostrarBtnGuardar('btnGuardarAlumno', true);
   } else {
-    const a = state.alumnado.find(x => x.id === id);
     document.getElementById('alumnoId').value   = a.id;
     document.getElementById('aApellidos').value = a.apellidos;
     document.getElementById('aNombre').value    = a.nombre;
     document.getElementById('aDni').value       = a.dni;
-    document.getElementById('aFamilia').value   = a.familia || '';
     document.getElementById('aObsPersonal').value = a.obs || '';
+    document.getElementById('aFechaNacimiento').value = a.fechaNacimiento || '';
+    document.getElementById('aTelefono1').value = a.telefono1 || '';
+    document.getElementById('aTelefono2').value = a.telefono2 || '';
+    actualizarEdadAlumno();
     renderListaEstancias(a.id);
     mostrarFormEstancia(null);
     if (modoEfectivo === 'datos') _mostrarBtnGuardar('btnGuardarAlumno', false);
   }
-  prepararSelectEditable('aFamilia', '➕ Añadir otra familia profesional…');
   document.getElementById('panelAlumno').scrollTop = 0;
   document.getElementById('overlayAlumno')?.classList.add('open');
 }
@@ -2332,7 +2342,7 @@ function renderListaEstancias(alumnoId) {
       + '<div style="background:var(--az);padding:12px 16px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px">'
         + '<div style="flex:1;min-width:0">'
           + '<div style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.55);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:3px">Empresa</div>'
-          + '<div style="font-family:\'Crimson Pro\',serif;font-size:18px;font-weight:600;color:white;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'
+          + '<div style="font-family:\'Crimson Pro\',serif;font-size:24px;font-weight:700;color:white;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'
           + (e.empresaNombre ? escHtml(e.empresaNombre) : '<span style="opacity:0.45;font-style:italic">Sin empresa asignada</span>')
           + '</div>'
           + (e.empresaCif ? '<div style="font-size:11px;color:rgba(255,255,255,0.5);font-family:monospace;margin-top:2px">'+escHtml(e.empresaCif)+'</div>' : '')
@@ -2374,14 +2384,14 @@ function renderListaEstancias(alumnoId) {
 
         // Acciones
         + (canWrite()
-            ? '<div style="display:flex;gap:6px;flex-wrap:wrap">'
-              + '<button class="btn btn-sm btn-secondary" onclick="mostrarFormEstancia('+e.id+')">'
-                + '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>'
+            ? '<div style="display:flex;gap:8px;flex-wrap:wrap">'
+              + '<button class="btn btn-secondary" style="padding:10px 16px;font-size:14px" onclick="mostrarFormEstancia('+e.id+')">'
+                + '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>'
                 + ' Editar estancia'
               + '</button>'
-              + '<button class="btn btn-sm btn-secondary" onclick="nuevaVisitaRapida('+e.id+')">+ Nueva visita</button>'
+              + '<button class="btn btn-secondary" style="padding:10px 16px;font-size:14px" onclick="nuevaVisitaRapida('+e.id+')">+ Nueva visita</button>'
               + (!e.deletePending
-                  ? '<button class="btn btn-sm btn-ghost" style="color:var(--red)" onclick="solicitarEliminarEstancia('+e.id+')">🗑 Borrar</button>'
+                  ? '<button class="btn btn-ghost" style="padding:10px 16px;font-size:14px;color:var(--red)" onclick="solicitarEliminarEstancia('+e.id+')">🗑 Borrar</button>'
                   : '<span class="badge badge-pend">⏳ Pendiente borrado</span>')
             + '</div>'
             : '')
@@ -3154,7 +3164,11 @@ async function guardarAlumno() {
   const nombre=document.getElementById('aNombre').value.trim();
   const dni=document.getElementById('aDni').value.trim();
   if(!apellidos||!nombre||!dni){toast('Apellidos, nombre y DNI son obligatorios','error');return;}
-  const body={apellidos,nombre,dni,familia:document.getElementById('aFamilia').value,obs:document.getElementById('aObsPersonal').value.trim()};
+  const body={apellidos,nombre,dni,
+    obs:document.getElementById('aObsPersonal').value.trim(),
+    fecha_nacimiento:document.getElementById('aFechaNacimiento').value,
+    telefono1:document.getElementById('aTelefono1').value.trim(),
+    telefono2:document.getElementById('aTelefono2').value.trim()};
   const idEl=document.getElementById('alumnoId').value;
   try {
     setSaveIndicator('pending');
@@ -3302,7 +3316,7 @@ async function cargarDatos() {
   setSaveIndicator('pending');
   try {
     const [{alumnado},{empresas},{pendientes},{historial}]=await Promise.all([Alumnado.list(),Empresas.list(),Pendientes.list(),Historial.list()]);
-    state.alumnado=alumnado.map(a=>({id:a.id,apellidos:a.apellidos,nombre:a.nombre,dni:a.dni,familia:a.familia||'',deleted:!!a.deleted,estancias:(a.estancias||[]).map(normalizarEstancia)}));
+    state.alumnado=alumnado.map(a=>({id:a.id,apellidos:a.apellidos,nombre:a.nombre,dni:a.dni,familia:a.familia||'',obs:a.obs||'',fechaNacimiento:a.fecha_nacimiento||'',telefono1:a.telefono1||'',telefono2:a.telefono2||'',deleted:!!a.deleted,estancias:(a.estancias||[]).map(normalizarEstancia)}));
     state.empresas=empresas.map(e=>({id:e.id,nombre:e.nombre,cif:e.cif,sector:e.sector||'',direccion:e.direccion||'',lat:e.lat||null,lon:e.lon||null,contactoNombre:e.contacto_nombre||'',contactoCargo:e.contacto_cargo||'',contactoTel:e.contacto_tel||'',contactoEmail:e.contacto_email||'',obs:e.obs||'',deleted:!!e.deleted}));
     state.pendientes=pendientes.map(p=>({id:p.id,tipo:p.tipo,refId:p.ref_id,nombre:p.nombre,solicitante:p.solicitante,fecha:p.created_at,resuelto:!!p.resuelto,aprobado:p.aprobado}));
     state.historial=historial.map(h=>({id:h.id,tipo:h.tipo,texto:h.texto,usuario:h.usuario,fecha:h.created_at}));
