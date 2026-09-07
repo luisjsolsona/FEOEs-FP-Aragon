@@ -77,6 +77,12 @@ const Historial = {
   deleteAll: ()          => window.apiFetch('/historial', { method: 'DELETE' }),
 };
 
+const Admin = {
+  backup:  ()     => window.apiFetch('/admin/backup'),
+  restore: (body) => window.apiFetch('/admin/restore', { method: 'POST', body }),
+  reset:   ()     => window.apiFetch('/admin/reset', { method: 'DELETE' }),
+};
+
 const Seguimientos = {
   list:    (params={}) => { const q=Object.entries(params).map(([k,v])=>k+'='+encodeURIComponent(v)).join('&'); return window.apiFetch('/seguimientos'+(q?'?'+q:'')); },
   visitas: (params={}) => { const q=Object.entries(params).map(([k,v])=>k+'='+encodeURIComponent(v)).join('&'); return window.apiFetch('/seguimientos/visitas'+(q?'?'+q:'')); },
@@ -816,17 +822,18 @@ window.addEventListener('unhandledrejection', function(e) {
 
         <div style="height:1px;background:var(--gray6);margin:4px 0"></div>
 
-        <!-- Copia de seguridad -->
-        <div style="padding:7px 14px 4px;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--gray4)">Copia de seguridad</div>
-        <button class="menu-item" onclick="exportarJSON()">
-          <span style="width:20px;text-align:center">📦</span> Exportar copia de seguridad (.json)
-        </button>
-        <label class="menu-item" style="cursor:pointer;display:flex;align-items:center;gap:0" onclick="cerrarMenuDatos()">
-          <span style="width:20px;text-align:center">📂</span> Restaurar copia de seguridad (.json)
-          <input type="file" accept=".json" style="display:none" onchange="restaurarBackupJSON(event)">
-        </label>
-
-        <div style="height:1px;background:var(--gray6);margin:4px 0"></div>
+        <!-- Copia de seguridad — solo admin -->
+        <div id="menuDatosCopiaSeguridad">
+          <div style="padding:7px 14px 4px;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--gray4)">Copia de seguridad</div>
+          <button class="menu-item" onclick="exportarJSON()">
+            <span style="width:20px;text-align:center">📦</span> Exportar copia de seguridad (.json)
+          </button>
+          <label class="menu-item" style="cursor:pointer;display:flex;align-items:center;gap:0" onclick="cerrarMenuDatos()">
+            <span style="width:20px;text-align:center">📂</span> Restaurar copia de seguridad (.json)
+            <input type="file" accept=".json" style="display:none" onchange="restaurarBackupJSON(event)">
+          </label>
+          <div style="height:1px;background:var(--gray6);margin:4px 0"></div>
+        </div>
 
         <!-- Exportar datos -->
         <div style="padding:7px 14px 4px;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--gray4)">Exportar datos</div>
@@ -837,13 +844,14 @@ window.addEventListener('unhandledrejection', function(e) {
           <span style="width:20px;text-align:center">🏢</span> Exportar empresas a Excel (.xlsx)
         </button>
 
-        <div style="height:1px;background:var(--gray6);margin:4px 0"></div>
-
-        <!-- Zona peligrosa -->
-        <div style="padding:7px 14px 4px;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--red)">Zona peligrosa</div>
-        <button class="menu-item" style="color:var(--red)" onclick="borrarTodosLosDatos()">
-          <span style="width:20px;text-align:center">🗑️</span> Borrar todos los datos
-        </button>
+        <div id="menuDatosZonaPeligrosa">
+          <div style="height:1px;background:var(--gray6);margin:4px 0"></div>
+          <!-- Zona peligrosa — solo admin -->
+          <div style="padding:7px 14px 4px;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--red)">Zona peligrosa</div>
+          <button class="menu-item" style="color:var(--red)" onclick="borrarTodosLosDatos()">
+            <span style="width:20px;text-align:center">🗑️</span> Borrar todos los datos
+          </button>
+        </div>
 
         <div id="storageInfo" style="padding:7px 14px;font-size:11px;color:var(--gray4);border-top:1px solid var(--gray6);margin-top:4px">BD SQLite · servidor</div>
       </div>
@@ -3217,6 +3225,10 @@ function autoguardar() {}
 function toggleMenuDatos(e) {
   e.stopPropagation();
   const m=document.getElementById('menuDatos');
+  const copiaSeg = document.getElementById('menuDatosCopiaSeguridad');
+  const zonaPel  = document.getElementById('menuDatosZonaPeligrosa');
+  if (copiaSeg) copiaSeg.style.display = isAdmin() ? '' : 'none';
+  if (zonaPel)  zonaPel.style.display  = isAdmin() ? '' : 'none';
   if(m.style.display==='none'||!m.style.display){m.style.display='block';actualizarInfoStorage();}
   else m.style.display='none';
 }
@@ -3230,68 +3242,47 @@ function actualizarInfoStorage() {
   el.innerHTML='BD SQLite · <b>'+n+' alumnos</b> · '+e+' empresas';
 }
 
+// Restauración completa: sustituye TODO el contenido de la base de datos por lo
+// que traiga el fichero (formato del nuevo /api/admin/backup — usuarios, empresas,
+// alumnado, estancias, seguimientos, histórico de prospección, pendientes e
+// historial). Es un reemplazo total, no una fusión: lo que había antes se pierde.
 async function restaurarBackupJSON(evt) {
   const file = evt.target.files[0];
   if (!file) return;
   evt.target.value = '';
   const reader = new FileReader();
-  reader.onload = async ev => {
-    try {
-      const d = JSON.parse(ev.target.result);
-      if (!d.alumnado || !d.empresas) throw new Error('Formato no reconocido');
-      confirmar(
-        'Restaurar copia de seguridad',
-        'El fichero contiene ' + d.alumnado.length + ' alumnos y ' + d.empresas.length + ' empresas.\n\nSe importaran los registros que no existan (por DNI/CIF). No se sobreescribiran los existentes.\n\n¿Continuar?',
-        async () => {
-          let al=0, emp=0, err=0;
-          // Import empresas first — guardar mapa CIF→id para enlazar estancias
-          const cifToId = {};
-          for (const e of (d.empresas||[])) {
-            if (!e.nombre || !e.cif) continue;
+  reader.onload = ev => {
+    let d;
+    try { d = JSON.parse(ev.target.result); }
+    catch (e) { toast('Error al leer el fichero: ' + e.message, 'error'); return; }
+
+    if (!d.tablas || typeof d.tablas !== 'object') {
+      toast('Este fichero no tiene el formato de copia de seguridad actual (le falta "tablas"). Si es un backup antiguo (solo alumnado/empresas), no es compatible con esta versión.', 'error');
+      return;
+    }
+
+    const resumen = Object.entries(d.tablas).map(([t, filas]) => `${t}: ${filas.length}`).join('\n');
+    confirmar(
+      '⚠️ Restaurar copia de seguridad',
+      'Esto SUSTITUYE TODO el contenido actual de la base de datos por el del fichero' + (d._generatedAt ? ' (generado el ' + new Date(d._generatedAt).toLocaleString('es-ES') + ')' : '') + ':\n\n' + resumen + '\n\nLos datos actuales se perderán. Esta operación no se puede deshacer.\n\n¿Continuar?',
+      () => {
+        confirmar(
+          '🗑️ Confirmación final',
+          'Segunda y última confirmación: se borrará todo lo que hay ahora y se reemplazará por el contenido del fichero.\n\n¿Confirmas la restauración?',
+          async () => {
             try {
-              const res = await Empresas.create({
-                nombre:e.nombre, cif:e.cif, sector:e.sector||'',
-                direccion:e.direccion||'', contacto_nombre:e.contactoNombre||'',
-                contacto_cargo:e.contactoCargo||'', contacto_tel:e.contactoTel||'',
-                contacto_email:e.contactoEmail||'', obs:e.obs||''
-              });
-              cifToId[e.cif.toUpperCase()] = res.empresa?.id || null;
-              emp++;
-            } catch { err++; }
+              const r = await Admin.restore(d);
+              await cargarDatos();
+              const detalle = Object.entries(r.restauradas || {}).map(([t, n]) => `${t}: ${n}`).join(' · ');
+              addHistorial('edit', 'Copia de seguridad restaurada — ' + detalle);
+              toast('Restauración completada — ' + detalle, 'success');
+            } catch (err) {
+              toast('Error al restaurar: ' + err.message, 'error');
+            }
           }
-          // Import alumnado + estancias
-          for (const a of (d.alumnado||[])) {
-            if (!a.apellidos || !a.nombre || !a.dni) continue;
-            try {
-              const {alumno} = await Alumnado.create({
-                apellidos:a.apellidos, nombre:a.nombre,
-                dni:a.dni, familia:a.familia||''
-              });
-              // Import estancias for this alumno
-              for (const est of (a.estancias||[])) {
-                if (!est.curso) continue;
-                try {
-                  const empCif = (est.empresaCif||'').toUpperCase();
-                  await Estancias.create({
-                    alumno_id: alumno.id, curso: est.curso,
-                    nivel: est.nivel||'', empresa_id: cifToId[empCif]||null,
-                    empresa_nombre: est.empresaNombre||'',
-                    empresa_cif: empCif, periodo_ini: est.periodoIni||'',
-                    periodo_fin: est.periodoFin||'', contacto: est.contacto||'',
-                    obs_empresa: est.obsEmpresa||'', obs_alumno: est.obsAlumno||'',
-                    calificacion: est.calificacion||''
-                  });
-                } catch {}
-              }
-              al++;
-            } catch { err++; }
-          }
-          await cargarDatos();
-          addHistorial('new', 'Backup restaurado: '+al+' alumnos, '+emp+' empresas');
-          toast('Restauracion completada: '+al+' alumnos, '+emp+' empresas'+(err?' ('+err+' errores)':''), 'success');
-        }
-      );
-    } catch(e) { toast('Error al leer el fichero: '+e.message, 'error'); }
+        );
+      }
+    );
   };
   reader.readAsText(file);
 }
@@ -3354,10 +3345,23 @@ async function borrarTodosLosDatos() {
   );
 }
 
-function exportarJSON() {
+// Copia de seguridad completa: pide al servidor un volcado íntegro de todas las
+// tablas (usuarios, empresas, alumnado, estancias, seguimientos, histórico de
+// prospección, pendientes e historial de actividad) — no solo lo que hay cargado
+// en el estado del navegador, que es una proyección parcial para la interfaz.
+async function exportarJSON() {
   cerrarMenuDatos();
-  descargarBlob(new Blob([JSON.stringify({alumnado:state.alumnado,empresas:state.empresas,_savedAt:new Date().toISOString()},null,2)],{type:'application/json'}),'FEOE_backup_'+new Date().toISOString().slice(0,10)+'.json');
-  toast('Backup exportado','success');
+  try {
+    const backup = await Admin.backup();
+    descargarBlob(
+      new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' }),
+      'FEOE_backup_' + new Date().toISOString().slice(0, 10) + '.json'
+    );
+    const resumen = Object.entries(backup.tablas).map(([t, filas]) => `${t}: ${filas.length}`).join(' · ');
+    toast('Backup exportado — ' + resumen, 'success');
+  } catch (err) {
+    toast('Error al exportar la copia de seguridad: ' + err.message, 'error');
+  }
 }
 
 async function guardarAlumno() {
