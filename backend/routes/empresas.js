@@ -66,7 +66,7 @@ router.put('/:id', requireProfe, (req, res) => {
 
 // PUT /api/empresas/:id/prospeccion — marcar estado de prospección (llamado/pendiente/ok/rechazada/sin_contactar)
 // y dejar constancia en el histórico con la nota escrita en ese momento.
-const ESTADOS_PROSPECCION = ['sin_contactar', 'llamado', 'pendiente', 'ok', 'rechazada'];
+const ESTADOS_PROSPECCION = ['sin_contactar', 'llamado', 'pendiente', 'ok', 'rechazada', 'ok_anyo_pasado'];
 router.put('/:id/prospeccion', requireProfe, (req, res) => {
   const id = parseInt(req.params.id);
   const e = db.prepare('SELECT * FROM empresas WHERE id = ?').get(id);
