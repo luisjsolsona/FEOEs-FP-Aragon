@@ -45,7 +45,7 @@ router.get('/visitas', requireAuth, (req, res) => {
 
 // POST /api/seguimientos
 router.post('/', requireProfe, (req, res) => {
-  const { estancia_id, alumno_id, fecha_visita, modalidad, anotaciones, num_visita } = req.body;
+  const { estancia_id, alumno_id, fecha_visita, modalidad, anotaciones, num_visita, autor_id, autor_nombre } = req.body;
   if (!estancia_id || !alumno_id) return res.status(400).json({ error: 'estancia_id y alumno_id son obligatorios.' });
 
   const estancia = db.prepare('SELECT * FROM estancias WHERE id = ? AND deleted = 0').get(estancia_id);
@@ -58,10 +58,16 @@ router.post('/', requireProfe, (req, res) => {
   // profe crea con pendiente=1, tutor/admin con pendiente=0
   const pendiente = (req.user.role === 'profe') ? 1 : 0;
 
+  // Docente que realiza la visita: admin/tutor pueden atribuirla a cualquier
+  // docente activo; profe siempre queda fijado a sí mismo (no puede suplantar).
+  const esGestor = req.user.role === 'admin' || req.user.role === 'tutor';
+  const autorIdFinal     = (esGestor && autor_id) ? autor_id : req.user.id;
+  const autorNombreFinal = (esGestor && autor_id && autor_nombre) ? autor_nombre : (req.user.nombre || req.user.role);
+
   const r = db.prepare(`INSERT INTO seguimientos (estancia_id, alumno_id, num_visita, fecha_visita, modalidad, anotaciones, autor_id, autor_nombre, pendiente)
     VALUES (?,?,?,?,?,?,?,?,?)`)
     .run(estancia_id, alumno_id, numVisita, fecha_visita||null, modalidad||'presencial',
-         anotaciones||null, req.user.id, req.user.nombre||req.user.role, pendiente);
+         anotaciones||null, autorIdFinal, autorNombreFinal, pendiente);
 
   res.status(201).json({ seguimiento: { id: r.lastInsertRowid, num_visita: numVisita, pendiente } });
 });
@@ -77,12 +83,16 @@ router.put('/:id', requireProfe, (req, res) => {
     return res.status(403).json({ error: 'Solo puedes editar tus propios seguimientos.' });
   }
 
-  const { fecha_visita, modalidad, anotaciones, num_visita } = req.body;
+  const { fecha_visita, modalidad, anotaciones, num_visita, autor_id, autor_nombre } = req.body;
   const pendiente = (req.user.role === 'profe') ? 1 : (req.body.pendiente !== undefined ? (req.body.pendiente ? 1 : 0) : s.pendiente);
 
-  db.prepare(`UPDATE seguimientos SET fecha_visita=?,modalidad=?,anotaciones=?,num_visita=?,pendiente=?,updated_at=datetime('now') WHERE id=?`)
+  const esGestor = req.user.role === 'admin' || req.user.role === 'tutor';
+  const autorIdFinal     = (esGestor && autor_id) ? autor_id : s.autor_id;
+  const autorNombreFinal = (esGestor && autor_id && autor_nombre) ? autor_nombre : s.autor_nombre;
+
+  db.prepare(`UPDATE seguimientos SET fecha_visita=?,modalidad=?,anotaciones=?,num_visita=?,pendiente=?,autor_id=?,autor_nombre=?,updated_at=datetime('now') WHERE id=?`)
     .run(fecha_visita??s.fecha_visita, modalidad??s.modalidad, anotaciones??s.anotaciones,
-         num_visita??s.num_visita, pendiente, id);
+         num_visita??s.num_visita, pendiente, autorIdFinal, autorNombreFinal, id);
 
   res.json({ ok: true });
 });

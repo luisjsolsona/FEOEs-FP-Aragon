@@ -1254,7 +1254,7 @@ window.addEventListener('unhandledrejection', function(e) {
             <textarea id="aObsPersonal" placeholder="Notas personales, circunstancias a tener en cuenta…" style="min-height:80px" oninput="autoGuardarAlumno()"></textarea>
           </div>
         </div>
-        <div class="form-row" style="margin-top:12px;gap:8px">
+        <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
           <a href="https://aplicaciones.aragon.es/sigaddweb/login" target="_blank" rel="noopener" class="btn btn-sm btn-secondary">🔗 SIGAD Didáctica</a>
           <a href="https://servicios.aragon.es/sigad-academica" target="_blank" rel="noopener" class="btn btn-sm btn-secondary">🔗 SIGAD Académica</a>
         </div>
@@ -1419,6 +1419,10 @@ window.addEventListener('unhandledrejection', function(e) {
                   <option value="telematica">💻 Telemática</option>
                 </select>
               </div>
+            </div>
+            <div class="form-group">
+              <label>Docente que realiza la visita</label>
+              <select id="seDocente"></select>
             </div>
             <div class="form-group">
               <label>Anotaciones de la visita</label>
@@ -2331,7 +2335,6 @@ function renderListaEstancias(alumnoId) {
 
     // Visitas semaphore
     const visitColor = nV===0 ? 'var(--red)' : nV<2 ? '#8B6000' : 'var(--green)';
-    const visitBg    = nV===0 ? 'var(--red-light)' : nV<2 ? '#FFF4E0' : 'var(--green-light)';
     const visitIcon  = nV===0 ? '⚠' : nV<2 ? '⏳' : '✓';
     const visitText  = nV===0 ? '0 visitas' : nV+' visita'+(nV!==1?'s':'');
 
@@ -2339,25 +2342,23 @@ function renderListaEstancias(alumnoId) {
       + (isActive ? ' id="estanciaCard_active"' : '') + '>'
 
       // ── Cabecera de tarjeta: empresa destacada ──
-      + '<div style="background:var(--az);padding:12px 16px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px">'
+      + '<div style="background:var(--az);padding:14px 16px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px">'
         + '<div style="flex:1;min-width:0">'
-          + '<div style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.55);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:3px">Empresa</div>'
-          + '<div style="font-family:\'Crimson Pro\',serif;font-size:24px;font-weight:700;color:white;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'
+          + '<div style="font-family:\'Crimson Pro\',serif;font-size:22px;font-weight:700;color:white;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'
           + (e.empresaNombre ? escHtml(e.empresaNombre) : '<span style="opacity:0.45;font-style:italic">Sin empresa asignada</span>')
           + '</div>'
           + (e.empresaCif ? '<div style="font-size:11px;color:rgba(255,255,255,0.5);font-family:monospace;margin-top:2px">'+escHtml(e.empresaCif)+'</div>' : '')
         + '</div>'
-        // Badges curso + nivel
-        + '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">'
-          + '<span class="badge badge-curso" style="font-size:12px">'+escHtml(e.curso)+'</span>'
-          + (e.nivel ? '<span class="badge" style="background:rgba(255,255,255,0.15);color:white;font-size:11px">'+escHtml(e.nivel)+'</span>' : '')
+        + '<div style="text-align:right;flex-shrink:0;color:rgba(255,255,255,0.85);font-size:12px">'
+          + '<div style="font-weight:700;color:var(--gold)">'+escHtml(e.curso)+'</div>'
+          + (e.nivel ? '<div style="margin-top:2px">'+escHtml(e.nivel)+'</div>' : '')
         + '</div>'
       + '</div>'
 
       // ── Cuerpo de tarjeta ──
-      + '<div style="padding:12px 16px;background:white">'
+      + '<div style="padding:14px 16px;background:white">'
         // Info fila: periodo + contacto
-        + '<div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:10px;font-size:12px;color:var(--gray3)">'
+        + '<div style="display:flex;flex-wrap:wrap;gap:14px;margin-bottom:8px;font-size:13px;color:var(--gray3)">'
           + (e.periodoIni
               ? '<span>📅 '+formatFecha(e.periodoIni)+' → '+formatFecha(e.periodoFin)+'</span>'
               : '<span style="color:var(--gray4)">📅 Sin periodo</span>')
@@ -2365,18 +2366,15 @@ function renderListaEstancias(alumnoId) {
           + (e.supervisorNombre ? '<span>🎓 '+escHtml(e.supervisorNombre)+'</span>' : '')
         + '</div>'
 
-        // Badges estado
-        + '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px">'
-          // Calificación
+        // Estado: texto plano con color, sin cajas
+        + '<div style="display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;margin-bottom:10px;font-size:12px;font-weight:600">'
           + (e.calificacion
-              ? '<span style="display:inline-flex;align-items:center;gap:4px;background:rgba(200,168,75,0.15);color:#7a5900;border:1px solid rgba(200,168,75,0.4);border-radius:5px;padding:3px 10px;font-size:12px;font-weight:700">📝 '+escHtml(e.calificacion)+'</span>'
-              : '<span style="display:inline-flex;align-items:center;gap:4px;background:var(--gray6);color:var(--gray4);border-radius:5px;padding:3px 10px;font-size:11px">Sin calificar</span>')
-          // Visitas semáforo
-          + '<span style="display:inline-flex;align-items:center;gap:5px;background:'+visitBg+';color:'+visitColor+';border-radius:5px;padding:3px 10px;font-size:12px;font-weight:700">'
-            + visitIcon+' '+visitText
-            + (nP>0 ? ' · <span style="font-weight:400;font-size:10px">'+nP+' pend. validar</span>' : '')
+              ? '<span style="color:#8a6d00">📝 '+escHtml(e.calificacion)+'</span>'
+              : '<span style="color:var(--gray4);font-weight:400">Sin calificar</span>')
+          + '<span style="color:'+visitColor+'">'+visitIcon+' '+visitText
+            + (nP>0 ? ' <span style="font-weight:400;color:var(--gray4)">· '+nP+' pend. validar</span>' : '')
           + '</span>'
-          + (e.deletePending ? '<span class="badge badge-pend">⏳ Pendiente borrado</span>' : '')
+          + (e.deletePending ? '<span style="color:var(--gold-dark,#8a6d00)">⏳ Pendiente borrado</span>' : '')
         + '</div>'
 
         // Observaciones si hay
@@ -3336,6 +3334,25 @@ function poblarSelectorSupervisor() {
   if(cur) sel.value=cur;
 }
 
+// Docente que realiza la visita de seguimiento. admin/tutor pueden elegir cualquier
+// docente activo; profe solo ve su propio nombre (fijo, sin poder atribuir la visita
+// a otra persona).
+function poblarSelectorDocenteVisita(autorIdActual) {
+  const sel = document.getElementById('seDocente');
+  if (!sel) return;
+  const esGestor = currentUser?.role === 'admin' || currentUser?.role === 'tutor';
+  if (esGestor) {
+    const docentes = (state.usuarios||[]).filter(u=>u.activo&&(u.role==='admin'||u.role==='tutor'||u.role==='profe'));
+    sel.innerHTML = docentes.map(u=>'<option value="'+u.id+'" data-nombre="'+escHtml(u.nombre||u.username)+'">'+(u.nombre||u.username)+'</option>').join('');
+    sel.disabled = false;
+    sel.value = autorIdActual || currentUser?.id || '';
+    if (!sel.value && docentes.length) sel.value = docentes[0].id;
+  } else {
+    sel.innerHTML = '<option value="'+(currentUser?.id||'')+'" data-nombre="'+escHtml(currentUser?.nombre||currentUser?.username||'')+'">'+(currentUser?.nombre||currentUser?.username||'')+'</option>';
+    sel.disabled = true;
+  }
+}
+
 function normalizarEstancia(e) {
   return {id:e.id,alumnoId:e.alumno_id,curso:e.curso||'',nivel:e.nivel||'',empresaId:e.empresa_id||null,empresaNombre:e.empresa_nombre||'',empresaCif:e.empresa_cif||'',periodoIni:e.periodo_ini||'',periodoFin:e.periodo_fin||'',contacto:e.contacto||'',obsEmpresa:e.obs_empresa||'',obsAlumno:e.obs_alumno||'',deleted:!!e.deleted,deletePending:!!e.delete_pending,calificacion:e.calificacion||'',supervisorId:e.supervisor_id||null,supervisorNombre:e.supervisor_nombre||'',numSeguimientos:e.num_seguimientos||0,numPendientesValidacion:e.num_pendientes_validacion||0};
 }
@@ -3532,7 +3549,7 @@ function renderSeguimientosList(segs) {
         + (isPending?' <span class="badge badge-pend" style="font-size:10px">Pendiente validacion</span>':'')
         +'</div>'
         +'<div style="font-size:13px;color:var(--gray1);white-space:pre-wrap">'+escHtml(s.anotaciones||'Sin anotaciones')+'</div>'
-        +'<div style="font-size:11px;color:var(--gray4);margin-top:4px">Por '+escHtml(s.autor_nombre||'—')+' · '+new Date(s.created_at).toLocaleDateString('es-ES')+'</div>'
+        +'<div style="font-size:11px;color:var(--gray4);margin-top:4px">🧑‍🏫 '+escHtml(s.autor_nombre||'—')+' · '+new Date(s.created_at).toLocaleDateString('es-ES')+'</div>'
         +'</div>'
         +'<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">'
         +(canWrite()?'<button class="btn btn-sm btn-ghost" onclick="abrirFormSeguimiento('+s.id+')" style="padding:3px 8px;font-size:11px">Editar</button>':'')
@@ -3553,12 +3570,14 @@ function abrirFormSeguimiento(id) {
     document.getElementById('seFecha').value = s.fecha_visita||'';
     document.getElementById('seModalidad').value = s.modalidad||'presencial';
     document.getElementById('seAnotaciones').value = s.anotaciones||'';
+    poblarSelectorDocenteVisita(s.autor_id);
     if (title) title.textContent = 'Editar visita '+s.num_visita;
   } else {
     document.getElementById('seguimientoId').value = '';
     document.getElementById('seFecha').value = new Date().toISOString().slice(0,10);
     document.getElementById('seModalidad').value = 'presencial';
     document.getElementById('seAnotaciones').value = '';
+    poblarSelectorDocenteVisita(null);
     const nextNum = (_seguimientosCache.filter(s=>!s.deleted).length||0)+1;
     if (title) title.textContent = 'Nueva visita (n.° '+nextNum+')';
   }
@@ -3575,12 +3594,16 @@ async function guardarSeguimiento() {
   if (!_currentEstanciaId) { toast('No hay estancia activa','error'); return; }
   const alumnoId = parseInt(document.getElementById('alumnoId').value);
   const id = document.getElementById('seguimientoId').value;
+  const docenteEl = document.getElementById('seDocente');
+  const docenteOpt = docenteEl?.options[docenteEl.selectedIndex];
   const body = {
     estancia_id:  _currentEstanciaId,
     alumno_id:    alumnoId,
     fecha_visita: document.getElementById('seFecha').value,
     modalidad:    document.getElementById('seModalidad').value,
     anotaciones:  document.getElementById('seAnotaciones').value.trim(),
+    autor_id:     parseInt(docenteEl?.value) || null,
+    autor_nombre: docenteOpt ? (docenteOpt.dataset.nombre || docenteOpt.textContent) : null,
   };
   if (!body.anotaciones) { toast('Escribe las anotaciones de la visita','error'); return; }
   try {
