@@ -1713,11 +1713,16 @@ function cambioCurso()   { _manejarSeleccionEditable('aCurso',   autoGuardarEsta
 function cambioNivel()   { _manejarSeleccionEditable('aNivel',   autoGuardarEstancia); }
 
 // ── Buscador de empresa (filtra el desplegable) ──
+// Quita acentos/diacríticos y pasa a minúsculas, para búsquedas tolerantes.
+function _normalizarBusqueda(s) {
+  return (s||'').toString().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+}
+
 function filtrarSelectEmpresa() {
-  const q = (document.getElementById('aEmpresaBuscador').value || '').toLowerCase().trim();
+  const q = _normalizarBusqueda(document.getElementById('aEmpresaBuscador').value);
   const sel = document.getElementById('aEmpresa');
   const actual = sel.value;
-  const empresas = state.empresas.filter(e => !e.deleted && (!q || `${e.nombre} ${e.cif}`.toLowerCase().includes(q)));
+  const empresas = state.empresas.filter(e => !e.deleted && (!q || _normalizarBusqueda(`${e.nombre} ${e.cif}`).includes(q)));
   sel.innerHTML = '<option value="" style="color:var(--gray1)">— Seleccionar empresa registrada —</option>'
     + empresas.map(e=>'<option value="'+e.id+'" style="background:white;color:var(--gray1)">'+escHtml(e.nombre)+' ('+escHtml(e.cif)+')</option>').join('');
   if (empresas.some(e => String(e.id) === String(actual))) sel.value = actual;
