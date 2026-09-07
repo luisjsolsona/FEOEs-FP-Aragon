@@ -1067,12 +1067,33 @@ window.addEventListener('unhandledrejection', function(e) {
     </div>
 
     <!-- Info box -->
-    <div style="background:#eef4ff;border:1.5px solid #b8ceff;border-radius:8px;padding:14px 18px;margin-bottom:16px;font-size:13px;color:#2a3a6b;display:flex;gap:12px;align-items:flex-start">
-      <span style="font-size:20px;flex-shrink:0">ℹ️</span>
-      <div>
-        <b>Gestión de usuarios.</b> El admin puede crear profesores con acceso a la aplicación.
-        Los profesores pueden crear y editar alumnos/estancias, pero <b>las eliminaciones requieren aprobación del administrador</b>.
-        La contraseña inicial debe comunicarse al docente, quien podrá cambiarla desde su perfil.
+    <div style="background:#eef4ff;border:1.5px solid #b8ceff;border-radius:8px;padding:14px 18px;margin-bottom:16px;font-size:13px;color:#2a3a6b">
+      <div style="display:flex;gap:12px;align-items:flex-start;cursor:pointer" onclick="const t=document.getElementById('tablaRoles');t.style.display=t.style.display==='none'?'block':'none';this.querySelector('.roles-arrow').textContent=t.style.display==='none'?'▸':'▾'">
+        <span style="font-size:20px;flex-shrink:0">ℹ️</span>
+        <div style="flex:1">
+          <b>Gestión de usuarios.</b> El admin puede crear profesores con acceso a la aplicación.
+          Los profesores pueden crear y editar alumnos/estancias, pero <b>las eliminaciones requieren aprobación del administrador</b>.
+          La contraseña inicial debe comunicarse al docente, quien podrá cambiarla desde su perfil.
+        </div>
+        <span class="roles-arrow" style="flex-shrink:0;font-size:12px;color:#5570b0">▸ Ver qué puede hacer cada rol</span>
+      </div>
+      <div id="tablaRoles" style="display:none;margin-top:14px;padding-top:14px;border-top:1px solid #b8ceff;overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;background:white;border-radius:6px;overflow:hidden">
+          <thead>
+            <tr style="background:#dfe9ff">
+              <th style="text-align:left;padding:8px 10px">Acción</th>
+              <th style="padding:8px 10px">Invitado</th>
+              <th style="padding:8px 10px">Profe</th>
+              <th style="padding:8px 10px">Tutor</th>
+              <th style="padding:8px 10px">Admin</th>
+            </tr>
+          </thead>
+          <tbody id="tablaRolesBody"></tbody>
+        </table>
+        <div style="margin-top:8px;font-size:11px;color:#5570b0">
+          Jerarquía: admin ⊃ tutor ⊃ profe ⊃ invitado — cada nivel hereda todo lo del anterior.
+          Excepción: las notas de prospección solo las puede editar quien las escribió, ni siquiera el admin puede modificar las de otro docente.
+        </div>
       </div>
     </div>
 
@@ -3662,7 +3683,37 @@ function rolBadgeStyle(role) {
 // ══════════════════════════════════════════
 //  USUARIOS — panel y tabla
 // ══════════════════════════════════════════
+const TABLA_ROLES = [
+  ['Ver alumnado, empresas, estancias, mapa', '✅','✅','✅','✅'],
+  ['Crear/editar alumnos, empresas, estancias, prospección, visitas', '❌','✅','✅','✅'],
+  ['Borrar alumno o estancia', '❌','Solo solicitar','✅','✅'],
+  ['Validar/aprobar seguimientos y solicitudes de borrado', '❌','❌','✅','✅'],
+  ['Editar la nota de prospección de otro docente', '❌','❌','❌','❌ (nadie puede)'],
+  ['Atribuir una visita de seguimiento a otro docente', '❌','❌','✅','✅'],
+  ['Ver la lista de usuarios', '❌','❌','✅ (solo ver)','✅'],
+  ['Crear/editar/borrar usuarios', '❌','❌','❌','✅'],
+  ['Cambiar la contraseña propia', '—','✅','✅','✅'],
+  ['Añadir entradas manuales al historial', '❌','❌','✅','✅'],
+  ['Borrar entradas del historial / vaciarlo', '❌','❌','❌','✅'],
+  ['Copia de seguridad (exportar/restaurar)', '❌','❌','❌','✅'],
+  ['Borrar todos los datos', '❌','❌','❌','✅'],
+];
+
+function renderTablaRoles() {
+  const body = document.getElementById('tablaRolesBody');
+  if (!body) return;
+  body.innerHTML = TABLA_ROLES.map(([accion,inv,profe,tutor,admin]) => `
+    <tr style="border-top:1px solid #eef2fb">
+      <td style="padding:7px 10px">${accion}</td>
+      <td style="padding:7px 10px;text-align:center">${inv}</td>
+      <td style="padding:7px 10px;text-align:center">${profe}</td>
+      <td style="padding:7px 10px;text-align:center">${tutor}</td>
+      <td style="padding:7px 10px;text-align:center">${admin}</td>
+    </tr>`).join('');
+}
+
 function renderUsuarios() {
+  renderTablaRoles();
   const q = (document.getElementById('searchUsuarios')?.value||'').toLowerCase();
   const tbody = document.getElementById('usuariosBody');
   const empty = document.getElementById('usuariosEmpty');
