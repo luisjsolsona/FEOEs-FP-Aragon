@@ -1321,9 +1321,11 @@ window.addEventListener('unhandledrejection', function(e) {
         <div style="border:1.5px solid var(--az);border-radius:8px;padding:12px 16px;margin-bottom:12px;background:white">
           <div style="font-size:11px;font-weight:700;color:var(--az);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:8px">🏢 Empresa</div>
           <div class="form-row" style="margin-bottom:8px">
-            <div class="form-group">
-              <input type="text" id="aEmpresaBuscador" placeholder="🔍 Buscar empresa por nombre o CIF…" oninput="filtrarSelectEmpresa()"
+            <div class="form-group" style="position:relative">
+              <input type="text" id="aEmpresaBuscador" placeholder="🔍 Buscar empresa por nombre o CIF…" autocomplete="off"
+                oninput="filtrarSelectEmpresa()" onfocus="filtrarSelectEmpresa()"
                 style="font-size:13px;margin-bottom:6px">
+              <div id="aEmpresaSugerencias" style="display:none;position:absolute;top:100%;left:0;right:0;background:white;border:1.5px solid var(--az);border-radius:0 0 8px 8px;box-shadow:var(--shadow-lg);max-height:220px;overflow-y:auto;z-index:20"></div>
               <select id="aEmpresa" onchange="autocompletarEmpresa();autoGuardarEstancia()" style="font-size:13px">
                 <option value="">— Seleccionar empresa registrada —</option>
               </select>
@@ -1712,7 +1714,7 @@ function _manejarSeleccionEditable(selectId, callbackGuardar) {
 function cambioCurso()   { _manejarSeleccionEditable('aCurso',   autoGuardarEstancia); }
 function cambioNivel()   { _manejarSeleccionEditable('aNivel',   autoGuardarEstancia); }
 
-// ── Buscador de empresa (filtra el desplegable) ──
+// ── Buscador de empresa (filtra el desplegable + muestra sugerencias clicables) ──
 // Quita acentos/diacríticos y pasa a minúsculas, para búsquedas tolerantes.
 function _normalizarBusqueda(s) {
   return (s||'').toString().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
@@ -1721,12 +1723,46 @@ function _normalizarBusqueda(s) {
 function filtrarSelectEmpresa() {
   const q = _normalizarBusqueda(document.getElementById('aEmpresaBuscador').value);
   const sel = document.getElementById('aEmpresa');
+  const sug = document.getElementById('aEmpresaSugerencias');
   const actual = sel.value;
   const empresas = state.empresas.filter(e => !e.deleted && (!q || _normalizarBusqueda(`${e.nombre} ${e.cif}`).includes(q)));
+
   sel.innerHTML = '<option value="" style="color:var(--gray1)">— Seleccionar empresa registrada —</option>'
     + empresas.map(e=>'<option value="'+e.id+'" style="background:white;color:var(--gray1)">'+escHtml(e.nombre)+' ('+escHtml(e.cif)+')</option>').join('');
   if (empresas.some(e => String(e.id) === String(actual))) sel.value = actual;
+
+  if (!sug) return;
+  if (!q) { sug.style.display = 'none'; sug.innerHTML=''; return; }
+  if (!empresas.length) {
+    sug.innerHTML = '<div style="padding:10px 12px;font-size:12px;color:var(--gray3)">Sin resultados para "'+escHtml(document.getElementById('aEmpresaBuscador').value)+'"</div>';
+    sug.style.display = 'block';
+    return;
+  }
+  sug.innerHTML = empresas.slice(0,8).map(e =>
+    '<div class="geo-sug-item" onmousedown="seleccionarEmpresaSugerida('+e.id+')">'
+      + '<div class="sug-main">'+escHtml(e.nombre)+'</div>'
+      + '<div class="sug-sub mono">'+escHtml(e.cif)+'</div>'
+    + '</div>'
+  ).join('');
+  sug.style.display = 'block';
 }
+
+function seleccionarEmpresaSugerida(id) {
+  const sel = document.getElementById('aEmpresa');
+  sel.value = id;
+  const sug = document.getElementById('aEmpresaSugerencias');
+  if (sug) { sug.style.display = 'none'; sug.innerHTML = ''; }
+  const emp = state.empresas.find(e => e.id === id);
+  document.getElementById('aEmpresaBuscador').value = emp ? emp.nombre : '';
+  autocompletarEmpresa();
+  autoGuardarEstancia();
+}
+
+document.addEventListener('click', (e) => {
+  const sug = document.getElementById('aEmpresaSugerencias');
+  const input = document.getElementById('aEmpresaBuscador');
+  if (sug && sug.style.display === 'block' && e.target !== input) sug.style.display = 'none';
+});
 
 // ── Calculadora de días del periodo ──
 // ── Edad calculada a partir de la fecha de nacimiento ──
@@ -2451,7 +2487,9 @@ function mostrarFormEstancia(estanciaId) {
     document.getElementById('aNivel').value='';
     document.getElementById('aEmpresa').value='';
   }
-  document.getElementById('aEmpresaBuscador').value = '';
+  document.getElementById('aEmpresaBuscador').value = estanciaId ? (findEstancia(estanciaId)?.empresaNombre || '') : '';
+  const sugCierre = document.getElementById('aEmpresaSugerencias');
+  if (sugCierre) { sugCierre.style.display = 'none'; sugCierre.innerHTML = ''; }
   prepararSelectEditable('aCurso', '➕ Añadir otro curso académico…');
   prepararSelectEditable('aNivel', '➕ Añadir otro nivel/ciclo…');
   actualizarDiasEstancia();
