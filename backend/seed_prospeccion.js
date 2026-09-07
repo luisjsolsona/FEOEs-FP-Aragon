@@ -4,7 +4,7 @@
 // prospección original); se usa un CIF-placeholder único "PROSP-NNN" que
 // debe sustituirse por el CIF real al validar el convenio.
 const db = require('./db');
-const csv = require('fs').readFileSync(require('path').join(__dirname, '..', 'docs', 'prospeccion', 'prospeccion_empresas_IFC_zaragoza.csv'), 'utf-8');
+const csv = require('fs').readFileSync(require('path').join(__dirname, 'prospeccion_empresas_IFC_zaragoza.csv'), 'utf-8');
 
 function parseCSV(text) {
   const rows = [];
