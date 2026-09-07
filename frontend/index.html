@@ -73,6 +73,8 @@ const Pendientes = {
 const Historial = {
   list:   (limit = 200) => window.apiFetch('/historial?limit='+limit),
   create: (tipo, texto) => window.apiFetch('/historial', { method: 'POST', body: { tipo, texto } }),
+  delete: (id)          => window.apiFetch(`/historial/${id}`, { method: 'DELETE' }),
+  deleteAll: ()          => window.apiFetch('/historial', { method: 'DELETE' }),
 };
 
 const Seguimientos = {
@@ -999,6 +1001,7 @@ window.addEventListener('unhandledrejection', function(e) {
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <input type="text" id="searchHistorial" placeholder="Buscar en historial…" oninput="renderHistorial()">
       </div>
+      <button class="btn btn-ghost" id="btnVaciarHistorial" style="display:none;color:var(--red)" onclick="vaciarHistorial()">🗑 Vaciar historial</button>
     </div>
     <div id="historialList" style="background:white;border:var(--border);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow)"></div>
   </div>
@@ -1013,29 +1016,36 @@ window.addEventListener('unhandledrejection', function(e) {
       <select class="filter-select" id="filterMapaCurso" onchange="filtrarMapa()">
         <option value="">Todos los cursos</option>
       </select>
-      <button class="btn btn-ghost btn-sm" onclick="geocodificarTodas(true)" id="btnGeoAll" title="Forzar re-geocodificación de todas las empresas (limpia caché)">
+      <button class="btn btn-secondary" style="padding:10px 16px;font-size:14px" onclick="geocodificarTodas(false)" id="btnGeoAll" title="Geolocaliza solo las empresas con dirección que aún no tienen coordenadas">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
         Geocodificar
       </button>
+      <button class="btn btn-ghost btn-sm" onclick="confirmar('🔄 Forzar re-geocodificación','Esto vuelve a geolocalizar TODAS las empresas desde cero (borra las coordenadas guardadas). Puede tardar varios minutos si hay muchas. ¿Continuar?',()=>geocodificarTodas(true))" title="Forzar re-geocodificación de todas las empresas desde cero (lento)">
+        🔄 Forzar todo
+      </button>
       <div id="mapaLegenda" style="display:flex;align-items:center;gap:12px;font-size:12px;color:var(--gray3);margin-left:auto">
-        <span style="display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#003DA5;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.3)"></span> Con alumnado actual</span>
-        <span style="display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#6B6F80;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.3)"></span> Sin alumnado</span>
+        <span style="display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#0F9D58;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.3)"></span> Con alumnado actual</span>
+        <span style="display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#D9480F;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.3)"></span> Sin alumnado</span>
       </div>
     </div>
-    <!-- Estado por empresa -->
-    <div id="mapaEstadoEmpresas" style="margin-bottom:12px;background:white;border:var(--border);border-radius:var(--radius);padding:14px 16px;box-shadow:var(--shadow)">
-      <div style="font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--gray3);margin-bottom:10px">Estado de geolocalización por empresa</div>
-      <div id="mapaEstadoLista" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px"></div>
-      <div style="margin-top:10px;font-size:11px;color:var(--gray4)">💡 <b>Consejo:</b> Para que una empresa aparezca en el mapa, rellena el campo <b>Dirección</b> en su ficha (calle, número y ciudad). Cuanto más completa, mejor resultado.</div>
-    </div>
-    <div style="position:relative;border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-lg);border:var(--border);isolation:isolate;z-index:0">
-      <div id="mapaContainer" style="height:calc(100vh - 220px);min-height:400px;background:var(--gray6)"></div>
-      <div id="mapaLoader" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(255,255,255,0.9);z-index:500;gap:10px">
-        <div style="width:36px;height:36px;border:3px solid var(--az-light);border-top-color:var(--az);border-radius:50%;animation:spin 0.8s linear infinite"></div>
-        <span id="mapaLoaderMsg" style="font-size:13px;color:var(--gray3)">Cargando mapa…</span>
+    <!-- Listado (izquierda) + Mapa (derecha) -->
+    <div style="display:flex;gap:12px;align-items:flex-start">
+      <div id="mapaSidebar" style="width:340px;flex-shrink:0;background:white;border:var(--border);border-radius:var(--radius);box-shadow:var(--shadow);height:calc(100vh - 220px);min-height:400px;overflow-y:auto">
+        <div style="padding:10px 12px;border-bottom:var(--border);font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--gray3);position:sticky;top:0;background:white">
+          Empresas (<span id="mapaSidebarCount">0</span>)
+        </div>
+        <div id="mapaListaEmpresas"></div>
+        <div style="padding:10px 12px;font-size:11px;color:var(--gray4);border-top:var(--border)">💡 Para que una empresa aparezca en el mapa, rellena el campo <b>Dirección</b> en su ficha.</div>
       </div>
-      <div id="sinDireccion" style="display:none;position:absolute;bottom:12px;left:50%;transform:translateX(-50%);background:white;border:var(--border);border-radius:20px;padding:6px 14px;font-size:12px;color:var(--gray3);box-shadow:var(--shadow);z-index:400;white-space:nowrap">
-        ⚠️ <span id="sinDireccionMsg"></span>
+      <div style="position:relative;flex:1;min-width:0;border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-lg);border:var(--border);isolation:isolate;z-index:0">
+        <div id="mapaContainer" style="height:calc(100vh - 220px);min-height:400px;background:var(--gray6)"></div>
+        <div id="mapaLoader" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(255,255,255,0.9);z-index:500;gap:10px">
+          <div style="width:36px;height:36px;border:3px solid var(--az-light);border-top-color:var(--az);border-radius:50%;animation:spin 0.8s linear infinite"></div>
+          <span id="mapaLoaderMsg" style="font-size:13px;color:var(--gray3)">Cargando mapa…</span>
+        </div>
+        <div id="sinDireccion" style="display:none;position:absolute;bottom:12px;left:50%;transform:translateX(-50%);background:white;border:var(--border);border-radius:20px;padding:6px 14px;font-size:12px;color:var(--gray3);box-shadow:var(--shadow);z-index:400;white-space:nowrap">
+          ⚠️ <span id="sinDireccionMsg"></span>
+        </div>
       </div>
     </div>
   </div>
@@ -2839,6 +2849,8 @@ function formatFechaHora(iso) {
 function renderHistorial() {
   const q = (document.getElementById('searchHistorial')?.value || '').toLowerCase();
   const list = document.getElementById('historialList');
+  const btnVaciar = document.getElementById('btnVaciarHistorial');
+  if (btnVaciar) btnVaciar.style.display = isAdmin() ? '' : 'none';
   let h = state.historial;
   if (q) h = h.filter(x => x.texto.toLowerCase().includes(q) || x.usuario.toLowerCase().includes(q));
 
@@ -2848,11 +2860,36 @@ function renderHistorial() {
   }
 
   list.innerHTML = h.map(x => `
-    <div class="hist-item ${x.tipo}">
-      <div class="hist-time">${formatFechaHora(x.fecha)} · <b>${x.usuario}</b></div>
-      <div>${x.tipo === 'new' ? '🟢' : x.tipo === 'edit' ? '🟡' : '🔴'} ${x.texto}</div>
+    <div class="hist-item ${x.tipo}" style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
+      <div>
+        <div class="hist-time">${formatFechaHora(x.fecha)} · <b>${x.usuario}</b></div>
+        <div>${x.tipo === 'new' ? '🟢' : x.tipo === 'edit' ? '🟡' : '🔴'} ${x.texto}</div>
+      </div>
+      ${isAdmin() ? `<button class="btn btn-sm btn-ghost" style="color:var(--red);flex-shrink:0" title="Borrar este registro" onclick="borrarEventoHistorial(${x.id})">🗑</button>` : ''}
     </div>
   `).join('');
+}
+
+async function borrarEventoHistorial(id) {
+  confirmar('🗑 Borrar registro', '¿Borrar esta entrada del historial? No se puede deshacer.', async () => {
+    try {
+      await Historial.delete(id);
+      state.historial = state.historial.filter(x => x.id !== id);
+      renderHistorial();
+      toast('Registro borrado','success');
+    } catch(err) { toast('Error: '+err.message,'error'); }
+  });
+}
+
+async function vaciarHistorial() {
+  confirmar('🗑 Vaciar historial', '¿Borrar TODO el historial de actividad? Esta acción no se puede deshacer.', async () => {
+    try {
+      await Historial.deleteAll();
+      state.historial = [];
+      renderHistorial();
+      toast('Historial vaciado','success');
+    } catch(err) { toast('Error: '+err.message,'error'); }
+  });
 }
 
 // ══════════════════════════════════════════
@@ -3966,6 +4003,7 @@ async function arrancarApp(){
 // ══════════════════════════════════════════
 let mapaInstance = null;
 let mapaMarkers = [];
+let mapaMarkersById = {};
 let mapaIniciado = false;
 let geocacheMap = {}; // cif → {lat, lon}
 let geocodificando = false;
@@ -3982,29 +4020,45 @@ function iniciarMapa() {
     document.getElementById('mapaLoaderMsg').textContent = 'Inicializando mapa…';
     // Centrado en Aragón
     mapaInstance = L.map('mapaContainer', { zoomControl: true }).setView([41.65, -0.87], 9);
-    // CartoDB Positron — no requiere Referer, funciona desde file://
-    const cartoLight = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/">CARTO</a>',
-      subdomains: 'abcd', maxZoom: 20, referrerPolicy: 'no-referrer'
+    // OpenStreetMap estándar — gratuito, sin API key, funciona siempre.
+    const osmStandard = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      subdomains: 'abc', maxZoom: 19
     });
-    const cartoColor = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/">CARTO</a>',
-      subdomains: 'abcd', maxZoom: 20, referrerPolicy: 'no-referrer'
+    // OpenStreetMap "Humanitarian" — alternativa también gratuita, sin clave.
+    const osmHot = L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>, tiles by HOT',
+      subdomains: 'abc', maxZoom: 19
     });
-    cartoColor.addTo(mapaInstance);
-    L.control.layers({ 'Mapa color': cartoColor, 'Mapa claro': cartoLight }, {}, { position: 'topright' }).addTo(mapaInstance);
+    osmStandard.addTo(mapaInstance);
+    L.control.layers({ 'Mapa estándar': osmStandard, 'Mapa humanitario': osmHot }, {}, { position: 'topright' }).addTo(mapaInstance);
     mapaIniciado = true;
   }
 
-  // Solo geocodificar si hay empresas con dirección que no tienen coords y no han sido intentadas
-  const hayNuevasPendientes = state.empresas.some(e =>
-    !e.deleted && e.direccion && e.direccion.trim() && !e.lat && !e.lon && !geocodificadoIntentado.has(e.cif)
-  );
-  if (hayNuevasPendientes) {
-    geocodificarTodas();
+  document.getElementById('mapaLoader').style.display = 'none';
+  renderMapaMarkers();
+  actualizarAvisoPendientes();
+}
+
+// Ya no se geocodifica en automático al entrar al mapa (antes disparaba de golpe
+// la geocodificación de TODAS las empresas pendientes cada vez, con la consiguiente
+// espera de 1 seg/empresa por el límite de peticiones de Nominatim). Ahora solo se
+// muestran las empresas que ya tienen coordenadas guardadas, y se avisa de cuántas
+// quedan pendientes con un botón para lanzarlo cuando el usuario quiera.
+function actualizarAvisoPendientes() {
+  const pendientes = state.empresas.filter(e => !e.deleted && e.direccion && e.direccion.trim() && !e.lat && !e.lon);
+  const sinDivEl = document.getElementById('sinDireccion');
+  const sinMsg = document.getElementById('sinDireccionMsg');
+  const btnGeoAll = document.getElementById('btnGeoAll');
+  if (btnGeoAll) btnGeoAll.innerHTML = `
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+    Geocodificar${pendientes.length ? ` (${pendientes.length} pendiente${pendientes.length!==1?'s':''})` : ''}`;
+  if (!sinDivEl) return;
+  if (pendientes.length) {
+    sinMsg.textContent = `${pendientes.length} empresa(s) con dirección aún sin geolocalizar. Pulsa "Geocodificar" para procesarlas.`;
+    sinDivEl.style.display = 'block';
   } else {
-    document.getElementById('mapaLoader').style.display = 'none';
-    renderMapaMarkers();
+    sinDivEl.style.display = 'none';
   }
 }
 
@@ -4047,6 +4101,7 @@ async function geocodificarTodas(forzar = false) {
     geocodificando = false;
     loader.style.display = 'none';
     mostrarAviso(sinDir);
+    actualizarAvisoPendientes();
     renderMapaMarkers();
     return;
   }
@@ -4090,6 +4145,7 @@ async function geocodificarTodas(forzar = false) {
   if (ok > 0 && fail === 0) toast(`${ok} empresa(s) geolocalizadas correctamente`, 'success');
   if (fail > 0) toast(`${fail} empresa(s) no se pudieron geolocalizar. Revisa la dirección.`, 'warning');
 
+  actualizarAvisoPendientes();
   renderMapaMarkers();
 }
 
@@ -4223,19 +4279,25 @@ function renderMapaMarkers() {
 
   mapaMarkers.forEach(m => m.remove());
   mapaMarkers = [];
+  mapaMarkersById = {};
 
   const q = (document.getElementById('searchMapa')?.value || '').toLowerCase();
   const fCurso = document.getElementById('filterMapaCurso')?.value || '';
-  const cursoActual = '2024-2025';
+  const cursoActual = cursoActualAcademico();
   const cursoRef = fCurso || cursoActual;
 
   const bounds = [];
   const todasEmpresas = state.empresas.filter(e => !e.deleted);
 
-  // ── Panel de estado ──
-  const listaEl = document.getElementById('mapaEstadoLista');
+  // ── Listado lateral (izquierda) ──
+  const listaEl = document.getElementById('mapaListaEmpresas');
+  const countEl = document.getElementById('mapaSidebarCount');
+  const empresasFiltradas = q
+    ? todasEmpresas.filter(emp => `${emp.nombre} ${emp.cif} ${emp.sector} ${emp.contactoNombre}`.toLowerCase().includes(q))
+    : todasEmpresas;
+  if (countEl) countEl.textContent = empresasFiltradas.length;
   if (listaEl) {
-    listaEl.innerHTML = todasEmpresas.map(emp => {
+    listaEl.innerHTML = empresasFiltradas.map(emp => {
       const tieneDir = emp.direccion && emp.direccion.trim();
       const tieneCoords = emp.lat && emp.lon;
       const nAct = state.estancias.filter(e => !e.deleted && (e.empresaId === emp.id || (!e.empresaId && e.empresaCif === emp.cif)) && e.curso === cursoRef).length;
@@ -4248,19 +4310,19 @@ function renderMapaMarkers() {
         estadoIcon = '⚠️'; estadoTxt = 'Sin dirección'; estadoColor = 'var(--red)';
       }
       const btnGeo = tieneDir && !tieneCoords
-        ? `<button id="btnGeo_${emp.id}" class="btn btn-sm" style="flex-shrink:0;padding:3px 8px;font-size:11px;background:#FFF4E0;color:#8B6000;border:1px solid #e0c060" onclick="geocodificarEmpresa(${emp.id})" title="Geocodificar solo esta empresa">📍 Geocodificar</button>`
+        ? `<button id="btnGeo_${emp.id}" class="btn btn-sm" style="flex-shrink:0;padding:3px 8px;font-size:11px;background:#FFF4E0;color:#8B6000;border:1px solid #e0c060" onclick="event.stopPropagation();geocodificarEmpresa(${emp.id})" title="Geocodificar solo esta empresa">📍</button>`
         : '';
       return `
-        <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border:var(--border);border-radius:4px;background:var(--gray7)">
-          <span style="font-size:16px">${estadoIcon}</span>
+        <div onclick="${tieneCoords ? `enfocarEmpresaMapa(${emp.id})` : `abrirPanelEmpresa(${emp.id})`}"
+          style="display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid var(--gray7);cursor:pointer;background:${nAct>0?'#EAF7EF':'white'}"
+          onmouseover="this.style.background='var(--az-light)'" onmouseout="this.style.background='${nAct>0?'#EAF7EF':'white'}'">
+          <span style="font-size:16px;flex-shrink:0">${estadoIcon}</span>
           <div style="flex:1;min-width:0">
             <div style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(emp.nombre)}</div>
-            <div style="font-size:11px;color:${estadoColor}">${estadoTxt}${tieneDir ? '' : ' — añade dirección en la ficha'}</div>
-            ${tieneDir ? `<div style="font-size:10px;color:var(--gray4);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(emp.direccion)}</div>` : ''}
+            <div style="font-size:11px;color:${estadoColor}">${estadoTxt}</div>
           </div>
-          <span style="font-size:11px;font-weight:700;color:var(--az);font-family:var(--mono);flex-shrink:0">${nAct > 0 ? nAct+'👤' : ''}</span>
+          ${nAct > 0 ? `<span style="font-size:11px;font-weight:700;color:#0F9D58;font-family:var(--mono);flex-shrink:0">${nAct}🧑‍🎓</span>` : ''}
           ${btnGeo}
-          <button class="btn btn-sm btn-ghost" style="flex-shrink:0;padding:3px 7px;font-size:11px" onclick="abrirPanelEmpresa(${emp.id})" title="Editar empresa">✏️</button>
         </div>`;
     }).join('');
   }
@@ -4276,7 +4338,7 @@ function renderMapaMarkers() {
     const alumnosActuales  = estAct.map(e=>{const a=state.alumnado.find(x=>x.id===e.alumnoId)||{}; return {...e,apellidos:a.apellidos||'?',nombre:a.nombre||''};});
     const alumnosHistorico = estHist.map(e=>{const a=state.alumnado.find(x=>x.id===e.alumnoId)||{}; return {...e,apellidos:a.apellidos||'?',nombre:a.nombre||''};});
     const tieneActuales = alumnosActuales.length > 0;
-    const color = tieneActuales ? '#003DA5' : '#6B6F80';
+    const color = tieneActuales ? '#0F9D58' : '#D9480F';
     const total = alumnosActuales.length;
 
     const svgIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="34" height="42" viewBox="0 0 34 42">
@@ -4295,6 +4357,7 @@ function renderMapaMarkers() {
     });
 
     mapaMarkers.push(marker);
+    mapaMarkersById[emp.id] = marker;
     bounds.push([emp.lat, emp.lon]);
   });
 
@@ -4362,6 +4425,13 @@ function buildPopupHTML(emp, alumnosActuales, alumnosHistorico, curso) {
 function filtrarMapa() {
   if (!mapaIniciado) return;
   renderMapaMarkers();
+}
+
+function enfocarEmpresaMapa(empresaId) {
+  const marker = mapaMarkersById[empresaId];
+  if (!marker || !mapaInstance) return;
+  mapaInstance.setView(marker.getLatLng(), Math.max(mapaInstance.getZoom(), 15), { animate: true });
+  marker.openPopup();
 }
 
 

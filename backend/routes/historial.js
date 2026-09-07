@@ -1,6 +1,6 @@
 const express = require('express');
 const db      = require('../db');
-const { requireAuth, requireTutor } = require('../middleware/auth');
+const { requireAuth, requireTutor, requireAdmin } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -18,6 +18,20 @@ router.post('/', requireTutor, (req, res) => {
   const r = db.prepare(`INSERT INTO historial (tipo, texto, usuario) VALUES (?,?,?)`)
     .run(tipo, texto, req.user.role);
   res.status(201).json({ id: r.lastInsertRowid });
+});
+
+// DELETE /api/historial/:id — solo admin, borrado físico (el historial no tiene soft-delete)
+router.delete('/:id', requireAdmin, (req, res) => {
+  const id = parseInt(req.params.id);
+  const r = db.prepare(`DELETE FROM historial WHERE id = ?`).run(id);
+  if (r.changes === 0) return res.status(404).json({ error: 'Entrada no encontrada.' });
+  res.json({ ok: true });
+});
+
+// DELETE /api/historial — solo admin, vacía todo el historial
+router.delete('/', requireAdmin, (req, res) => {
+  const r = db.prepare(`DELETE FROM historial`).run();
+  res.json({ ok: true, borrados: r.changes });
 });
 
 module.exports = router;
