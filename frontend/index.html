@@ -872,6 +872,7 @@ window.addEventListener('unhandledrejection', function(e) {
       </div>
     </div>
     <span id="roleDisplay" class="role-badge admin">👤 Administrador</span>
+    <button class="btn btn-sm" style="background:rgba(255,255,255,0.15);color:white;border:1px solid rgba(255,255,255,0.3)" onclick="abrirModalMiContrasena()" title="Cambiar tu propia contraseña">🔑 Mi contraseña</button>
     <button class="btn btn-sm" style="background:rgba(255,255,255,0.15);color:white;border:1px solid rgba(255,255,255,0.3)" onclick="toggleRole()">Cambiar rol</button>
   </div>
 </header>
@@ -1559,6 +1560,37 @@ window.addEventListener('unhandledrejection', function(e) {
   </div>
 </div>
 
+<!-- ── MODAL MI CONTRASEÑA (cualquier rol) ── -->
+<div class="overlay" id="overlayMiContrasena" onclick="if(event.target===this)cerrarModalMiContrasena()">
+  <div class="panel" id="panelMiContrasena" style="max-width:440px">
+    <div class="panel-header">
+      <div><h2>🔑 Cambiar mi contraseña</h2></div>
+      <button class="close-btn" onclick="cerrarModalMiContrasena()">✕</button>
+    </div>
+    <div class="panel-body" style="padding:20px 24px">
+      <div class="form-section">
+        <div class="form-group" id="grupoContrasenaActual">
+          <label>Contraseña actual</label>
+          <input type="password" id="miPassActual" autocomplete="current-password">
+        </div>
+        <div class="form-group" style="margin-top:10px">
+          <label>Contraseña nueva</label>
+          <input type="password" id="miPassNueva" autocomplete="new-password" placeholder="Mínimo 10 caracteres">
+        </div>
+        <div class="form-group" style="margin-top:10px">
+          <label>Repite la contraseña nueva</label>
+          <input type="password" id="miPassNueva2" autocomplete="new-password">
+        </div>
+        <div id="miPassError" style="display:none;margin-top:10px;font-size:12px;color:var(--red)"></div>
+      </div>
+    </div>
+    <div class="panel-footer">
+      <button class="btn btn-ghost" onclick="cerrarModalMiContrasena()">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarMiContrasena()">Guardar contraseña</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── MODAL PROSPECCIÓN MASIVA (empresas seleccionadas) ── -->
 <div class="overlay" id="overlayProspeccionMasiva" onclick="if(event.target===this)cerrarModalProspeccionMasiva()">
   <div class="panel" id="panelProspeccionMasiva" style="max-width:640px">
@@ -1644,7 +1676,7 @@ window.addEventListener('unhandledrejection', function(e) {
             </label>
             <div style="position:relative">
               <input type="text" id="eDireccion" placeholder="Escribe calle, número y ciudad…"
-                     oninput="buscarDireccionAuto()" autocomplete="off" style="height:44px;font-size:15px;padding:10px 14px"
+                     oninput="buscarDireccionAuto()" autocomplete="off" style="height:44px;font-size:15px;padding:10px 14px;width:100%;box-sizing:border-box"
                      onblur="setTimeout(()=>{ const s=document.getElementById('eDireccionSugs'); if(s) s.style.display='none'; },200)">
               <div id="eDireccionSugs" style="display:none;position:absolute;top:100%;left:0;right:0;background:white;border:1.5px solid var(--az);border-radius:0 0 8px 8px;box-shadow:var(--shadow-lg);z-index:50;max-height:260px;overflow-y:auto"></div>
             </div>
@@ -3914,6 +3946,42 @@ function addHistorialAPI(tipo,texto) {
 }
 function addHistorial(tipo,texto){addHistorialAPI(tipo,texto);}
 
+// Cambio de contraseña propia — disponible para cualquier rol, sin pasar por la
+// pantalla de gestión de usuarios (esa sigue siendo solo admin/tutor).
+function abrirModalMiContrasena() {
+  document.getElementById('miPassActual').value = '';
+  document.getElementById('miPassNueva').value = '';
+  document.getElementById('miPassNueva2').value = '';
+  document.getElementById('miPassError').style.display = 'none';
+  // El admin no necesita confirmar su contraseña actual (el backend no lo exige para ese rol)
+  document.getElementById('grupoContrasenaActual').style.display = currentUser?.role === 'admin' ? 'none' : 'block';
+  document.getElementById('overlayMiContrasena')?.classList.add('open');
+}
+
+function cerrarModalMiContrasena() {
+  document.getElementById('overlayMiContrasena')?.classList.remove('open');
+}
+
+async function guardarMiContrasena() {
+  const errEl = document.getElementById('miPassError');
+  errEl.style.display = 'none';
+  const actual = document.getElementById('miPassActual').value;
+  const nueva  = document.getElementById('miPassNueva').value;
+  const nueva2 = document.getElementById('miPassNueva2').value;
+
+  if (nueva.length < 10) { errEl.textContent = 'La contraseña nueva debe tener al menos 10 caracteres.'; errEl.style.display = 'block'; return; }
+  if (nueva !== nueva2)  { errEl.textContent = 'Las dos contraseñas nuevas no coinciden.'; errEl.style.display = 'block'; return; }
+  if (currentUser?.role !== 'admin' && !actual) { errEl.textContent = 'Escribe tu contraseña actual.'; errEl.style.display = 'block'; return; }
+
+  try {
+    await window.apiFetch(`/users/${currentUser.id}/password`, { method: 'PUT', body: { currentPassword: actual, newPassword: nueva } });
+    cerrarModalMiContrasena();
+    toast('Contraseña actualizada', 'success');
+  } catch (err) {
+    errEl.textContent = err.message; errEl.style.display = 'block';
+  }
+}
+
 function toggleRole() {
   confirmar('Cerrar sesion','Cerrar la sesion actual?',async()=>{
     await Auth.logout(); currentUser=null;
@@ -4461,6 +4529,10 @@ async function arrancarApp(){
   const esAdmin = currentUser.role==='admin';
   const tabP=document.getElementById('tab-pendientes'); if(tabP)tabP.style.display=esAdmin?'flex':'none';
   const tabH=document.getElementById('tab-historial');  if(tabH)tabH.style.display=esAdmin?'flex':'none';
+  // Siempre aterrizar en Empresas al iniciar sesión — si no se fuerza aquí, la vista que
+  // quedara visible de una sesión anterior (p. ej. Usuarios, vista de admin) se queda tal
+  // cual en el DOM sin recargar la página, y el siguiente usuario que entre la vería.
+  switchTab('empresas');
   await cargarDatos();
   poblarSelectorSupervisor();
 }
@@ -4847,8 +4919,10 @@ function renderMapaMarkers() {
     const popupHTML = buildPopupHTML(emp, alumnosActuales, alumnosHistorico, cursoRef);
     marker.bindPopup(popupHTML, { maxWidth: 340, minWidth: 280 });
     marker.on('popupopen', () => {
-      const btn = document.querySelector('.emp-popup-btn');
-      if (btn) btn.onclick = () => { marker.closePopup(); switchTab('empresas'); abrirModalEstanciasEmpresa(emp.id); };
+      const btnEst = document.querySelector('.emp-popup-btn-estancias');
+      if (btnEst) btnEst.onclick = () => { marker.closePopup(); switchTab('empresas'); abrirModalEstanciasEmpresa(emp.id); };
+      const btnEdit = document.querySelector('.emp-popup-btn-editar');
+      if (btnEdit) btnEdit.onclick = () => { marker.closePopup(); abrirPanelEmpresa(emp.id); };
     });
 
     mapaMarkers.push(marker);
@@ -4909,10 +4983,13 @@ function buildPopupHTML(emp, alumnosActuales, alumnosHistorico, curso) {
   }
 
   if (emp.obs) {
-    html += `<div style="margin-top:8px;font-size:12px;color:var(--gray3);font-style:italic;border-top:1px solid var(--gray6);padding-top:8px">${emp.obs}</div>`;
+    html += `<div style="margin-top:8px;font-size:12px;color:var(--gray3);font-style:italic;border-top:1px solid var(--gray6);padding-top:8px">${escHtml(emp.obs)}</div>`;
   }
 
-  html += `<button class="emp-popup-btn">📋 Ver ficha completa</button>`;
+  html += `<div style="display:flex;gap:6px;margin-top:10px">
+    <button class="emp-popup-btn emp-popup-btn-estancias" style="margin-top:0;width:auto;flex:1">📅 Ver Estancias</button>
+    <button class="emp-popup-btn emp-popup-btn-editar" style="margin-top:0;width:auto;flex:1;background:var(--gray3)">🏢 Ver datos empresa</button>
+  </div>`;
   html += '</div>';
   return html;
 }
