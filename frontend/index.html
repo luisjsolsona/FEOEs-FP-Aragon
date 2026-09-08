@@ -3365,15 +3365,16 @@ function exportarCSV() {
   descargarBlob(new Blob(['\uFEFF'+cab+'\n'+filas.join('\n')],{type:'text/csv;charset=utf-8'}),'Alumnado-FEOE_estancias_'+new Date().toISOString().slice(0,10)+'.csv');
   toast('CSV exportado: '+data.length+' estancias','success');
 }
-function exportarEmpresasExcel() {
+async function exportarEmpresasExcel() {
   cerrarMenuDatos();
   const q=(document.getElementById('searchEmpresa')?.value||'').toLowerCase();
   const data=state.empresas.filter(e=>!e.deleted);
   const filtradas=q?data.filter(e=>(e.nombre+' '+e.cif).toLowerCase().includes(q)):data;
   const idsFiltradas = new Set(filtradas.map(e=>e.id));
 
-  const rows=[['ID','Nombre','CIF','Sector','Direccion','Contacto','Cargo','Telefono','Email','Obs','N Estancias'],
+  const rows=[['ID','Nombre','CIF','Sector','Direccion','Contacto','Cargo','Telefono','Email','Obs','Estado Prospeccion','Fecha Ultima Gestion','Gestionado Por','N Estancias'],
     ...filtradas.map(e=>[e.id,e.nombre,e.cif,e.sector,e.direccion,e.contactoNombre,e.contactoCargo,e.contactoTel,e.contactoEmail,e.obs,
+      (PROSPECCION_INFO[e.prospeccionEstado]||PROSPECCION_INFO.sin_contactar).label, e.prospeccionFecha||'', e.prospeccionContacto||'',
       state.estancias.filter(s=>!s.deleted&&(s.empresaId===e.id||(!s.empresaId&&s.empresaCif===e.cif))).length])];
 
   // Hoja 2: relación alumno–empresa (una fila por estancia) de las empresas exportadas
@@ -3386,17 +3387,34 @@ function exportarEmpresasExcel() {
     });
   const rowsRelacion = [['Empresa','CIF','Apellidos Alumno','Nombre Alumno','DNI','Curso','Nivel','Periodo Inicio','Periodo Fin','Contacto','Obs. Empresa','Obs. Alumno'], ...relacion];
 
+  // Hoja 3: histórico completo de prospección — se pide fresco al servidor para
+  // TODAS las empresas exportadas, no solo las que se hayan desplegado en pantalla
+  // (el caché local state._prospHist solo tiene lo que se haya abierto alguna vez).
+  toast('Generando Excel… obteniendo histórico de prospección', 'info');
+  const historiales = await Promise.all(filtradas.map(e => Empresas.prospeccionHistorial(e.id).then(r => ({e, h: r.historial})).catch(() => ({e, h: []}))));
+  const historialTodos = [];
+  historiales.forEach(({e, h}) => {
+    h.forEach(x => historialTodos.push([e.nombre, e.cif, (PROSPECCION_INFO[x.estado]||{}).label||x.estado, x.autor_nombre||'', new Date(x.created_at).toLocaleDateString('es-ES'), x.nota||'']));
+  });
+  const rowsHistorial = [['Empresa','CIF','Estado','Docente','Fecha','Nota'], ...historialTodos];
+
   const wb=XLSX.utils.book_new();
   const ws=XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols']=[4,30,12,20,35,20,20,14,30,40,8].map(w=>({wch:w}));
+  ws['!cols']=[4,30,12,20,35,20,20,14,30,40,18,14,20,8].map(w=>({wch:w}));
   XLSX.utils.book_append_sheet(wb,ws,'Empresas_FEOE');
 
   const ws2=XLSX.utils.aoa_to_sheet(rowsRelacion);
   ws2['!cols']=[30,12,18,14,12,11,8,13,13,24,30,30].map(w=>({wch:w}));
   XLSX.utils.book_append_sheet(wb,ws2,'Relacion_Alumnos_Empresa');
 
+  if (historialTodos.length) {
+    const ws3=XLSX.utils.aoa_to_sheet(rowsHistorial);
+    ws3['!cols']=[30,12,18,20,12,50].map(w=>({wch:w}));
+    XLSX.utils.book_append_sheet(wb,ws3,'Historico_Prospeccion');
+  }
+
   XLSX.writeFile(wb,'Empresas-FEOE_empresas_'+new Date().toISOString().slice(0,10)+'.xlsx');
-  toast('Excel exportado: '+filtradas.length+' empresas, '+relacion.length+' estancias','success');
+  toast('Excel exportado: '+filtradas.length+' empresas, '+relacion.length+' estancias'+(historialTodos.length?', '+historialTodos.length+' gestiones de prospección':''),'success');
 }
 async function borrarTodosLosDatos() {
   cerrarMenuDatos();
