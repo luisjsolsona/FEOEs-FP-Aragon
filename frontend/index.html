@@ -899,6 +899,11 @@ window.addEventListener('unhandledrejection', function(e) {
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
     Mapa
   </div>
+  <div class="tab" onclick="switchTab('visitas')" id="tab-visitas">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+    Visitas
+    <span class="count" id="cnt-visitas">0</span>
+  </div>
   <div class="tab" onclick="switchTab('usuarios')" id="tab-usuarios" style="display:none;margin-left:auto">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/><circle cx="19" cy="8" r="2.5"/><path d="M22 12c1.5.5 2 1.5 2 3"/></svg>
     Usuarios
@@ -977,42 +982,6 @@ window.addEventListener('unhandledrejection', function(e) {
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
         Eliminar seleccionados
       </button>
-    </div>
-
-    <!-- Visitas de seguimiento — colapsable, unido a Alumnado -->
-    <div style="margin-top:18px;background:white;border:var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden">
-      <div style="padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;flex-wrap:wrap" onclick="toggleSeccionVisitas()">
-        <div style="display:flex;align-items:center;gap:8px;font-family:'Crimson Pro',serif;font-size:16px;font-weight:600;color:var(--az)">
-          <span id="visitasArrow">▸</span> 📋 Visitas de seguimiento
-          <span class="count" id="cnt-visitas">0</span>
-        </div>
-      </div>
-      <div id="seccionVisitas" style="display:none;border-top:var(--border)">
-        <div class="toolbar">
-          <div class="search-wrap">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input type="text" id="searchVisitas" placeholder="Buscar alumno o empresa..." oninput="renderVisitas()">
-          </div>
-          <select class="filter-select" id="filterVisitasCurso" onchange="renderVisitas()">
-            <option value="">Todos los cursos</option>
-          </select>
-          <select class="filter-select" id="filterVisitasPendientes" onchange="renderVisitas()">
-            <option value="">Todos</option>
-            <option value="pendiente">Pendientes validacion</option>
-            <option value="ok">Validados</option>
-          </select>
-          <button class="btn btn-ghost btn-sm" onclick="cargarVisitas()">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.49"/></svg>
-            Actualizar
-          </button>
-        </div>
-        <div id="visitasContent" style="padding:0 16px 16px">
-          <div class="empty-state">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-            <p>Cargando visitas...</p>
-          </div>
-        </div>
-      </div>
     </div>
   </div>
 
@@ -1109,6 +1078,35 @@ window.addEventListener('unhandledrejection', function(e) {
         <div id="sinDireccion" style="display:none;position:absolute;bottom:12px;left:50%;transform:translateX(-50%);background:white;border:var(--border);border-radius:20px;padding:6px 14px;font-size:12px;color:var(--gray3);box-shadow:var(--shadow);z-index:400;white-space:nowrap">
           ⚠️ <span id="sinDireccionMsg"></span>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── VISTA VISITAS ── -->
+  <div id="view-visitas" style="display:none">
+    <div class="toolbar">
+      <div class="search-wrap">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="searchVisitas" placeholder="Buscar alumno o empresa..." oninput="renderVisitas()">
+      </div>
+      <select class="filter-select" id="filterVisitasCurso" onchange="renderVisitas()">
+        <option value="">Todos los cursos</option>
+      </select>
+      <select class="filter-select" id="filterVisitasPendientes" onchange="renderVisitas()">
+        <option value="">Todos</option>
+        <option value="pendiente">Pendientes validacion</option>
+        <option value="ok">Validados</option>
+      </select>
+      <button class="btn btn-ghost btn-sm" onclick="cargarVisitas()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.49"/></svg>
+        Actualizar
+      </button>
+    </div>
+
+    <div id="visitasContent">
+      <div class="empty-state">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <p>Cargando visitas...</p>
       </div>
     </div>
   </div>
@@ -2226,7 +2224,7 @@ function updateEstanciaLocal(id,patch) {
 // ══════════════════════════════════════════
 function switchTab(tab) {
   state.currentTab = tab;
-  ['alumnado','empresas','pendientes','historial','mapa','usuarios'].forEach(t => {
+  ['alumnado','empresas','pendientes','historial','mapa','visitas','usuarios'].forEach(t => {
     const el = document.getElementById('view-'+t);
     if (el) el.style.display = t === tab ? 'block' : 'none';
     document.getElementById('tab-'+t)?.classList.toggle('active', t === tab);
@@ -2236,20 +2234,11 @@ function switchTab(tab) {
   if (tab === 'pendientes') renderPendientes();
   if (tab === 'historial')  renderHistorial();
   if (tab === 'mapa')       iniciarMapa();
+  if (tab === 'visitas')    cargarVisitas();
   if (tab === 'usuarios')   { cargarYMostrarUsuarios(); }
   actualizarContadores();
 }
 
-// Sección "Visitas de seguimiento" dentro de Alumnado — colapsable, carga bajo demanda.
-let _visitasCargadas = false;
-function toggleSeccionVisitas() {
-  const body = document.getElementById('seccionVisitas');
-  const arrow = document.getElementById('visitasArrow');
-  const visible = body.style.display !== 'none';
-  body.style.display = visible ? 'none' : 'block';
-  arrow.textContent = visible ? '▸' : '▾';
-  if (!visible && !_visitasCargadas) { _visitasCargadas = true; cargarVisitas(); }
-}
 
 async function cargarYMostrarUsuarios() {
   try {
@@ -2442,6 +2431,7 @@ async function marcarProspeccionMasiva(estado) {
   }
   limpiarSeleccionEmpresas();
   renderEmpresas();
+  if (ok) addHistorial('edit', 'Prospección en bloque: '+ok+' empresa(s) → '+(PROSPECCION_INFO[estado]?.label||estado)+(nota?' — "'+nota+'"':''));
   toast(`Prospección actualizada en ${ok} empresa(s)`+(fail?` — ${fail} con error`:''), fail ? 'warning' : 'success');
 }
 
@@ -2863,6 +2853,7 @@ async function marcarProspeccion(empresaId, estado) {
     renderBotonesProspeccion(emp);
     renderEmpresas();
     await cargarProspeccionHistorial(empresaId);
+    addHistorial('edit', 'Prospección: '+(emp?.nombre||'Empresa #'+empresaId)+' → '+(PROSPECCION_INFO[estado]?.label||estado)+(nota?' — "'+nota+'"':''));
     toast('Prospección actualizada: '+(PROSPECCION_INFO[estado]?.label||estado),'success');
   } catch(err) { toast('Error: '+err.message,'error'); }
 }
