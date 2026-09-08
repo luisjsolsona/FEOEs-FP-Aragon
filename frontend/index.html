@@ -1644,7 +1644,7 @@ window.addEventListener('unhandledrejection', function(e) {
             </label>
             <div style="position:relative">
               <input type="text" id="eDireccion" placeholder="Escribe calle, número y ciudad…"
-                     oninput="buscarDireccionAuto()" autocomplete="off"
+                     oninput="buscarDireccionAuto()" autocomplete="off" style="height:44px;font-size:15px;padding:10px 14px"
                      onblur="setTimeout(()=>{ const s=document.getElementById('eDireccionSugs'); if(s) s.style.display='none'; },200)">
               <div id="eDireccionSugs" style="display:none;position:absolute;top:100%;left:0;right:0;background:white;border:1.5px solid var(--az);border-radius:0 0 8px 8px;box-shadow:var(--shadow-lg);z-index:50;max-height:260px;overflow-y:auto"></div>
             </div>
@@ -2080,6 +2080,7 @@ function autoGuardarEstancia() {
 
 // ── Autocompletado dirección empresa con Nominatim ──
 let _geoSugTimer = null;
+let _geoSugData = [];
 
 function buscarDireccionAuto() {
   // Al escribir manualmente, invalidar coordenadas previas
@@ -2131,7 +2132,8 @@ function buscarDireccionAuto() {
       return;
     }
 
-    sug.innerHTML = data.slice(0, 6).map(item => {
+    _geoSugData = data.slice(0, 6);
+    sug.innerHTML = _geoSugData.map((item, i) => {
       const a = item.address || {};
       const road   = a.road || a.pedestrian || a.footway || a.path || item.display_name.split(',')[0];
       const num    = a.house_number || '';
@@ -2139,8 +2141,7 @@ function buscarDireccionAuto() {
       const ciudad = a.city || a.town || a.village || a.municipality || '';
       const linea1 = [road, num].filter(Boolean).join(', ');
       const linea2 = [cp, ciudad].filter(Boolean).join(', ');
-      const dirLimpia = [linea1, linea2].filter(Boolean).join(', ');
-      return `<div class="geo-sug-item" onmousedown="seleccionarDireccionOSM(${JSON.stringify(dirLimpia)}, ${item.lat}, ${item.lon})">
+      return `<div class="geo-sug-item" onmousedown="seleccionarDireccionOSM(${i})">
         <div class="sug-main">${escHtml(linea1)}${linea2 ? '<span style="font-weight:400;color:var(--gray3)"> — '+escHtml(linea2)+'</span>' : ''}</div>
         <div class="sug-sub">${escHtml(item.display_name)}</div>
       </div>`;
@@ -2151,10 +2152,19 @@ function buscarDireccionAuto() {
   autoGuardarEmpresa();
 }
 
-function seleccionarDireccionOSM(dirLimpia, lat, lon) {
+function seleccionarDireccionOSM(indice) {
+  const item = _geoSugData[indice];
+  if (!item) return;
+  const a = item.address || {};
+  const road   = a.road || a.pedestrian || a.footway || a.path || item.display_name.split(',')[0];
+  const num    = a.house_number || '';
+  const cp     = a.postcode || '';
+  const ciudad = a.city || a.town || a.village || a.municipality || '';
+  const dirLimpia = [[road, num].filter(Boolean).join(', '), [cp, ciudad].filter(Boolean).join(', ')].filter(Boolean).join(', ');
+
   document.getElementById('eDireccion').value = dirLimpia;
-  document.getElementById('eDireccionLat').value = lat;
-  document.getElementById('eDireccionLon').value = lon;
+  document.getElementById('eDireccionLat').value = item.lat;
+  document.getElementById('eDireccionLon').value = item.lon;
   document.getElementById('eDireccionSugs').style.display = 'none';
   document.getElementById('eDireccionStatus').innerHTML =
     '✅ Dirección verificada en OpenStreetMap — coordenadas listas';
