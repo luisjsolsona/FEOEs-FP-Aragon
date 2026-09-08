@@ -1,11 +1,11 @@
 const express = require('express');
 const db      = require('../db');
-const { requireAuth, requireTutor } = require('../middleware/auth');
+const { requireAuth, requireAdmin } = require('../middleware/auth');
 
 const router = express.Router();
 
-// GET /api/pendientes
-router.get('/', requireAuth, (req, res) => {
+// GET /api/pendientes — solo admin
+router.get('/', requireAuth, requireAdmin, (req, res) => {
   const pendientes = db.prepare(`SELECT * FROM pendientes ORDER BY created_at DESC`).all();
   res.json({ pendientes });
 });
@@ -27,7 +27,7 @@ router.post('/', requireAuth, (req, res) => {
 });
 
 // PUT /api/pendientes/:id/resolver — aprobar o rechazar (solo admin)
-router.put('/:id/resolver', requireTutor, (req, res) => {
+router.put('/:id/resolver', requireAdmin, (req, res) => {
   const id = parseInt(req.params.id);
   const { aprobar } = req.body;
   const p = db.prepare('SELECT * FROM pendientes WHERE id = ?').get(id);

@@ -853,15 +853,15 @@ window.addEventListener('unhandledrejection', function(e) {
 </header>
 
 <nav>
-  <div class="tab active" onclick="switchTab('alumnado')" id="tab-alumnado">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
-    Alumnado
-    <span class="count" id="cnt-alumnado">0</span>
-  </div>
-  <div class="tab" onclick="switchTab('empresas')" id="tab-empresas">
+  <div class="tab active" onclick="switchTab('empresas')" id="tab-empresas">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/></svg>
     Empresas
     <span class="count" id="cnt-empresas">0</span>
+  </div>
+  <div class="tab" onclick="switchTab('alumnado')" id="tab-alumnado">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+    Alumnado
+    <span class="count" id="cnt-alumnado">0</span>
   </div>
   <div class="tab" onclick="switchTab('pendientes')" id="tab-pendientes">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
@@ -876,11 +876,6 @@ window.addEventListener('unhandledrejection', function(e) {
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
     Mapa
   </div>
-  <div class="tab" onclick="switchTab('visitas')" id="tab-visitas">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-    Visitas
-    <span class="count" id="cnt-visitas">0</span>
-  </div>
   <div class="tab" onclick="switchTab('usuarios')" id="tab-usuarios" style="display:none;margin-left:auto">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/><circle cx="19" cy="8" r="2.5"/><path d="M22 12c1.5.5 2 1.5 2 3"/></svg>
     Usuarios
@@ -891,7 +886,7 @@ window.addEventListener('unhandledrejection', function(e) {
 <main>
 
   <!-- ── VISTA ALUMNADO ── -->
-  <div id="view-alumnado">
+  <div id="view-alumnado" style="display:none">
     <div class="stats-bar" id="statsBar"></div>
     <div class="toolbar">
       <div class="search-wrap">
@@ -960,10 +955,46 @@ window.addEventListener('unhandledrejection', function(e) {
         Eliminar seleccionados
       </button>
     </div>
+
+    <!-- Visitas de seguimiento — colapsable, unido a Alumnado -->
+    <div style="margin-top:18px;background:white;border:var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden">
+      <div style="padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;flex-wrap:wrap" onclick="toggleSeccionVisitas()">
+        <div style="display:flex;align-items:center;gap:8px;font-family:'Crimson Pro',serif;font-size:16px;font-weight:600;color:var(--az)">
+          <span id="visitasArrow">▸</span> 📋 Visitas de seguimiento
+          <span class="count" id="cnt-visitas">0</span>
+        </div>
+      </div>
+      <div id="seccionVisitas" style="display:none;border-top:var(--border)">
+        <div class="toolbar">
+          <div class="search-wrap">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="searchVisitas" placeholder="Buscar alumno o empresa..." oninput="renderVisitas()">
+          </div>
+          <select class="filter-select" id="filterVisitasCurso" onchange="renderVisitas()">
+            <option value="">Todos los cursos</option>
+          </select>
+          <select class="filter-select" id="filterVisitasPendientes" onchange="renderVisitas()">
+            <option value="">Todos</option>
+            <option value="pendiente">Pendientes validacion</option>
+            <option value="ok">Validados</option>
+          </select>
+          <button class="btn btn-ghost btn-sm" onclick="cargarVisitas()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.49"/></svg>
+            Actualizar
+          </button>
+        </div>
+        <div id="visitasContent" style="padding:0 16px 16px">
+          <div class="empty-state">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <p>Cargando visitas...</p>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- ── VISTA EMPRESAS ── -->
-  <div id="view-empresas" style="display:none">
+  <div id="view-empresas">
     <div class="toolbar">
       <div class="search-wrap">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -987,8 +1018,8 @@ window.addEventListener('unhandledrejection', function(e) {
   <!-- ── VISTA PENDIENTES ── -->
   <div id="view-pendientes" style="display:none">
     <div style="margin-bottom:12px">
-      <h2 style="font-size:15px;font-weight:600;color:var(--red);margin-bottom:4px">⚠️ Solicitudes de eliminación pendientes</h2>
-      <p style="font-size:12px;color:var(--gray3)">Solo los administradores pueden aprobar o rechazar estas solicitudes. Los registros permanecen visibles hasta su confirmación.</p>
+      <h2 style="font-size:15px;font-weight:600;color:var(--az);margin-bottom:4px">🗑️ Solicitudes de eliminación</h2>
+      <p style="font-size:12px;color:var(--gray3)">Cuando un profesor pide eliminar un alumno, estancia o empresa, la solicitud queda registrada aquí — el registro original no se borra hasta que un administrador la autoriza.</p>
     </div>
     <div id="pendientesList"></div>
   </div>
@@ -1114,35 +1145,6 @@ window.addEventListener('unhandledrejection', function(e) {
     </div>
     <div id="usuariosEmpty" class="empty-state" style="display:none">
       <p>No se encontraron usuarios.</p>
-    </div>
-  </div>
-
-  <!-- ── VISTA VISITAS ── -->
-  <div id="view-visitas" style="display:none">
-    <div class="toolbar">
-      <div class="search-wrap">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input type="text" id="searchVisitas" placeholder="Buscar alumno o empresa..." oninput="renderVisitas()">
-      </div>
-      <select class="filter-select" id="filterVisitasCurso" onchange="renderVisitas()">
-        <option value="">Todos los cursos</option>
-      </select>
-      <select class="filter-select" id="filterVisitasPendientes" onchange="renderVisitas()">
-        <option value="">Todos</option>
-        <option value="pendiente">Pendientes validacion</option>
-        <option value="ok">Validados</option>
-      </select>
-      <button class="btn btn-ghost btn-sm" onclick="cargarVisitas()">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.49"/></svg>
-        Actualizar
-      </button>
-    </div>
-
-    <div id="visitasContent">
-      <div class="empty-state">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-        <p>Cargando visitas...</p>
-      </div>
     </div>
   </div>
 
@@ -1535,8 +1537,10 @@ window.addEventListener('unhandledrejection', function(e) {
       <div><h2 id="estEmpModalTitulo">🧑‍🎓 Alumnado en estancia</h2></div>
       <button class="close-btn" onclick="cerrarModalEstanciasEmpresa()">✕</button>
     </div>
-    <div class="panel-body" style="padding:0">
-      <div id="estEmpModalBody"></div>
+    <div class="panel-body" style="padding:20px 24px">
+      <div class="form-section" style="margin:0">
+        <div id="estEmpModalBody"></div>
+      </div>
     </div>
     <div class="panel-footer">
       <button class="btn btn-ghost" onclick="cerrarModalEstanciasEmpresa()">Cerrar</button>
@@ -2162,7 +2166,7 @@ function updateEstanciaLocal(id,patch) {
 // ══════════════════════════════════════════
 function switchTab(tab) {
   state.currentTab = tab;
-  ['alumnado','empresas','pendientes','historial','mapa','visitas','usuarios'].forEach(t => {
+  ['alumnado','empresas','pendientes','historial','mapa','usuarios'].forEach(t => {
     const el = document.getElementById('view-'+t);
     if (el) el.style.display = t === tab ? 'block' : 'none';
     document.getElementById('tab-'+t)?.classList.toggle('active', t === tab);
@@ -2172,9 +2176,19 @@ function switchTab(tab) {
   if (tab === 'pendientes') renderPendientes();
   if (tab === 'historial')  renderHistorial();
   if (tab === 'mapa')       iniciarMapa();
-  if (tab === 'visitas')    cargarVisitas();
   if (tab === 'usuarios')   { cargarYMostrarUsuarios(); }
   actualizarContadores();
+}
+
+// Sección "Visitas de seguimiento" dentro de Alumnado — colapsable, carga bajo demanda.
+let _visitasCargadas = false;
+function toggleSeccionVisitas() {
+  const body = document.getElementById('seccionVisitas');
+  const arrow = document.getElementById('visitasArrow');
+  const visible = body.style.display !== 'none';
+  body.style.display = visible ? 'none' : 'block';
+  arrow.textContent = visible ? '▸' : '▾';
+  if (!visible && !_visitasCargadas) { _visitasCargadas = true; cargarVisitas(); }
 }
 
 async function cargarYMostrarUsuarios() {
@@ -2194,7 +2208,7 @@ async function cargarYMostrarUsuarios() {
 function renderStats() {
   const alActivos  = state.alumnado.filter(a => !a.deleted);
   const estActivas = state.estancias.filter(e => !e.deleted);
-  const cursoActual = [...new Set(estActivas.map(e=>e.curso))].sort().reverse()[0] || '2024-2025';
+  const cursoActual = [...new Set(estActivas.map(e=>e.curso))].sort().reverse()[0] || cursoActualAcademico();
   const estCurso   = estActivas.filter(e => e.curso === cursoActual);
   const empresasAct = new Set(estCurso.map(e=>e.empresaNombre)).size;
   document.getElementById('statsBar').innerHTML = `
@@ -2513,7 +2527,7 @@ function renderListaEstancias(alumnoId) {
           + '<span style="color:'+visitColor+'">'+visitIcon+' '+visitText
             + (nP>0 ? ' <span style="font-weight:400;color:var(--gray4)">· '+nP+' pend. validar</span>' : '')
           + '</span>'
-          + (e.deletePending ? '<span style="color:var(--gold-dark,#8a6d00)">⏳ Pendiente borrado</span>' : '')
+          + (e.deletePending ? '<span style="color:var(--gold-dark,#8a6d00)">📋 Pendiente de autorizar</span>' : '')
         + '</div>'
 
         // Observaciones si hay
@@ -2529,7 +2543,7 @@ function renderListaEstancias(alumnoId) {
               + '<button class="btn btn-secondary" style="padding:10px 16px;font-size:14px" onclick="nuevaVisitaRapida('+e.id+')">+ Nueva visita</button>'
               + (!e.deletePending
                   ? '<button class="btn btn-ghost" style="padding:10px 16px;font-size:14px;color:var(--red)" onclick="solicitarEliminarEstancia('+e.id+')">🗑 Borrar</button>'
-                  : '<span class="badge badge-pend">⏳ Pendiente borrado</span>')
+                  : '<span class="badge badge-pend">📋 Pendiente de autorizar</span>')
             + '</div>'
             : '')
       + '</div>'
@@ -2795,13 +2809,13 @@ function abrirModalEstanciasEmpresa(empresaId) {
   document.getElementById('estEmpModalTitulo').textContent = '🧑‍🎓 Alumnado en estancia — ' + e.nombre;
   const body = document.getElementById('estEmpModalBody');
   if (!ests.length) {
-    body.innerHTML = '<div style="padding:20px;text-align:center;font-size:13px;color:var(--gray4)">Sin alumnado registrado en esta empresa.</div>';
+    body.innerHTML = '<div style="padding:20px 0;text-align:center;font-size:13px;color:var(--gray4)">Sin alumnado registrado en esta empresa.</div>';
   } else {
     body.innerHTML = Object.keys(byYear).sort().reverse().map(curso => `
-      <div style="padding:8px 14px;font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--gray3);background:var(--gray7);border-bottom:var(--border)">
-        Curso ${curso}${curso===cursoActual ? ' <span style="color:#0F9D58">· actual</span>' : ''}
+      <div class="form-section-title" style="margin-top:14px">
+        Curso ${curso}${curso===cursoActual ? ' <span style="color:#0F9D58;font-weight:700">· actual</span>' : ''}
       </div>
-      <table class="empresa-alumnos">
+      <table class="empresa-alumnos" style="width:100%">
         ${byYear[curso].map(a => {
           const vColor = a.nVisitas===0 ? 'var(--red)' : a.nVisitas<2 ? '#8B6000' : 'var(--green)';
           const vBg    = a.nVisitas===0 ? 'var(--red-light)' : a.nVisitas<2 ? '#FFF4E0' : 'var(--green-light)';
@@ -2902,27 +2916,27 @@ function renderPendientes() {
   const pendientes = state.pendientes.filter(p => !p.resuelto);
 
   if (!pendientes.length) {
-    list.innerHTML = `<div class="empty-state"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg><p>No hay solicitudes pendientes.</p><p style="font-size:12px;color:var(--gray4);margin-top:6px;max-width:360px">Los pendientes aparecen cuando un profesor solicita eliminar un alumno o estancia. Un administrador debe aprobar o rechazar la solicitud.</p></div>`;
+    list.innerHTML = `<div class="empty-state"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg><p>No hay solicitudes registradas.</p><p style="font-size:12px;color:var(--gray4);margin-top:6px;max-width:360px">Aquí aparecen las solicitudes cuando un profesor pide eliminar un alumno, estancia o empresa. El registro se queda tal cual hasta que un administrador la autoriza o la descarta.</p></div>`;
     return;
   }
 
   list.innerHTML = `
     <div class="pending-section">
-      <h3>⚠️ ${pendientes.length} solicitud(es) pendiente(s) de revisión</h3>
+      <h3>🗑️ ${pendientes.length} solicitud(es) registrada(s)</h3>
       ${pendientes.map(p => `
         <div class="pending-item">
           <div>
             <strong>${p.tipo === 'alumno' ? '👤' : p.tipo === 'estancia' ? '📅' : '🏢'} ${p.nombre}</strong>
             <div style="font-size:11px;color:var(--gray3);margin-top:2px">
-              Solicitado por <b>${p.solicitante}</b> · ${formatFechaHora(p.fecha)}
+              Registrada por <b>${p.solicitante}</b> · ${formatFechaHora(p.fecha)}
             </div>
           </div>
-          ${canValidate() ? `
+          ${isAdmin() ? `
             <div class="pending-actions">
-              <button class="btn btn-sm" style="background:var(--green);color:white" onclick="resolverPendiente(${p.id},true)">✓ Aprobar</button>
-              <button class="btn btn-sm btn-ghost" onclick="resolverPendiente(${p.id},false)">✕ Rechazar</button>
+              <button class="btn btn-sm" style="background:var(--green);color:white" onclick="resolverPendiente(${p.id},true)">✓ Autorizar</button>
+              <button class="btn btn-sm btn-ghost" onclick="resolverPendiente(${p.id},false)">✕ Descartar</button>
             </div>
-          ` : `<span class="badge badge-pend">⏳ Esperando admin</span>`}
+          ` : `<span class="badge badge-pend">📋 Registrada — pendiente de autorización</span>`}
         </div>
       `).join('')}
     </div>
@@ -2932,7 +2946,7 @@ function renderPendientes() {
         ${state.pendientes.filter(p=>p.resuelto).map(p=>`
           <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:white;border:var(--border);border-radius:4px;margin-bottom:6px;font-size:12px">
             <span>${p.tipo === 'alumno' ? '👤' : p.tipo === 'estancia' ? '📅' : '🏢'} ${p.nombre}</span>
-            <span class="badge ${p.aprobado ? 'badge-ok' : 'badge-del'}">${p.aprobado ? '✓ Aprobado' : '✕ Rechazado'}</span>
+            <span class="badge ${p.aprobado ? 'badge-ok' : 'badge-del'}">${p.aprobado ? '✓ Autorizada' : '✕ Descartada'}</span>
           </div>
         `).join('')}
       </div>
@@ -3623,15 +3637,15 @@ function solicitarEliminarEstancia(estanciaId) {
 }
 
 async function solicitarEliminar(tipo,refId,nombre) {
-  if(state.pendientes.find(p=>p.tipo===tipo&&p.refId===refId&&!p.resuelto)){toast('Ya existe solicitud pendiente','warning');return;}
-  confirmar('Solicitar eliminación','Se solicitara la eliminacion de "'+nombre+'".\n\nEl registro quedara marcado y un administrador debera confirmarlo.',async()=>{
+  if(state.pendientes.find(p=>p.tipo===tipo&&p.refId===refId&&!p.resuelto)){toast('Ya hay una solicitud registrada para esto','warning');return;}
+  confirmar('Solicitar eliminación','Se registrará la solicitud de eliminar "'+nombre+'".\n\nEl registro no se borra todavía: queda marcado y un administrador deberá autorizarlo.',async()=>{
     try {
       await Pendientes.create({tipo,ref_id:refId,nombre});
       addHistorial('del','Solicitud eliminacion: '+tipo+' "'+nombre+'"');
-      toast('Solicitud enviada. Pendiente de aprobacion.','warning');
+      toast('Solicitud registrada. Pendiente de autorización.','warning');
       if(tipo==='estancia'){updateEstanciaLocal(refId,{deletePending:true});const ep=findEstancia(refId);if(ep?.alumnoId)renderListaEstancias(ep.alumnoId);}
       await cargarDatos(); actualizarContadores();
-      if(canValidate()) switchTab('pendientes');
+      if(isAdmin()) switchTab('pendientes');
     } catch(err){toast('Error: '+err.message,'error');}
   });
 }
@@ -3639,8 +3653,8 @@ async function solicitarEliminar(tipo,refId,nombre) {
 async function resolverPendiente(pid,aprobar) {
   try {
     await Pendientes.resolver(pid,aprobar);
-    addHistorial('del','Eliminacion '+(aprobar?'APROBADA':'RECHAZADA')+' por admin');
-    toast(aprobar?'Eliminacion aprobada.':'Solicitud rechazada.',aprobar?'success':'warning');
+    addHistorial('del','Eliminacion '+(aprobar?'AUTORIZADA':'DESCARTADA')+' por admin');
+    toast(aprobar?'Eliminación autorizada.':'Solicitud descartada.',aprobar?'success':'warning');
     await cargarDatos(); renderPendientes(); renderTabla(); renderEmpresas(); renderStats(); actualizarContadores();
   } catch(err){toast('Error: '+err.message,'error');}
 }
@@ -3678,14 +3692,22 @@ function toggleRole() {
 async function cargarDatos() {
   setSaveIndicator('pending');
   try {
-    const [{alumnado},{empresas},{pendientes},{historial}]=await Promise.all([Alumnado.list(),Empresas.list(),Pendientes.list(),Historial.list()]);
+    const esAdmin = currentUser?.role === 'admin';
+    const [{alumnado},{empresas}]=await Promise.all([Alumnado.list(),Empresas.list()]);
+    // Pendientes e Historial son ahora exclusivos de admin — no pedirlos para el resto
+    // de roles, o el backend devolvería 403 y rompería la carga inicial de toda la app.
+    const [pendientesRes, historialRes] = esAdmin
+      ? await Promise.all([Pendientes.list(), Historial.list()])
+      : [{pendientes:[]}, {historial:[]}];
+    const {pendientes} = pendientesRes;
+    const {historial} = historialRes;
     state.alumnado=alumnado.map(a=>({id:a.id,apellidos:a.apellidos,nombre:a.nombre,dni:a.dni,familia:a.familia||'',obs:a.obs||'',fechaNacimiento:a.fecha_nacimiento||'',telefono1:a.telefono1||'',telefono2:a.telefono2||'',deleted:!!a.deleted,estancias:(a.estancias||[]).map(normalizarEstancia)}));
     state.empresas=empresas.map(e=>({id:e.id,nombre:e.nombre,cif:e.cif,sector:e.sector||'',direccion:e.direccion||'',lat:e.lat||null,lon:e.lon||null,contactoNombre:e.contacto_nombre||'',contactoCargo:e.contacto_cargo||'',contactoTel:e.contacto_tel||'',contactoEmail:e.contacto_email||'',obs:e.obs||'',prospeccionEstado:e.prospeccion_estado||'sin_contactar',prospeccionFecha:e.prospeccion_fecha||'',prospeccionContacto:e.prospeccion_contacto||'',prospeccionNotas:e.prospeccion_notas||'',deleted:!!e.deleted}));
     state.pendientes=pendientes.map(p=>({id:p.id,tipo:p.tipo,refId:p.ref_id,nombre:p.nombre,solicitante:p.solicitante,fecha:p.created_at,resuelto:!!p.resuelto,aprobado:p.aprobado}));
     state.historial=historial.map(h=>({id:h.id,tipo:h.tipo,texto:h.texto,usuario:h.usuario,fecha:h.created_at}));
     state.empresas.forEach(e=>{if(e.lat&&e.lon) geocacheMap[e.cif]={lat:e.lat,lon:e.lon};});
     if(currentUser?.role==='admin'||currentUser?.role==='tutor'){try{const{users}=await Users.list();state.usuarios=users;}catch{state.usuarios=[];}}
-    setSaveIndicator('saved'); actualizarFiltros(); renderTabla(); renderStats(); actualizarContadores();
+    setSaveIndicator('saved'); actualizarFiltros(); renderTabla(); renderStats(); renderEmpresas(); actualizarContadores();
     poblarSelectorSupervisor();
   } catch(err){setSaveIndicator('error');toast('Error al cargar datos: '+err.message,'error');}
 }
@@ -3779,8 +3801,11 @@ function rolBadgeStyle(role) {
 const TABLA_ROLES = [
   ['Ver alumnado, empresas, estancias, mapa', '✅','✅','✅','✅'],
   ['Crear/editar alumnos, empresas, estancias, prospección, visitas', '❌','✅','✅','✅'],
-  ['Borrar alumno o estancia', '❌','Solo solicitar','✅','✅'],
-  ['Validar/aprobar seguimientos y solicitudes de borrado', '❌','❌','✅','✅'],
+  ['Borrar alumno o estancia (directamente)', '❌','Solo solicitar','✅','✅'],
+  ['Validar/aprobar seguimientos pendientes', '❌','❌','✅','✅'],
+  ['Autorizar/descartar solicitudes de eliminación de un profe', '❌','❌','❌','✅'],
+  ['Ver y gestionar la pestaña Pendientes', '❌','❌','❌','✅'],
+  ['Ver y gestionar la pestaña Historial', '❌','❌','❌','✅'],
   ['Editar la nota de prospección de otro docente', '❌','❌','❌','❌ (nadie puede)'],
   ['Atribuir una visita de seguimiento a otro docente', '❌','❌','✅','✅'],
   ['Ver la lista de usuarios', '❌','❌','✅ (solo ver)','✅'],
@@ -4142,8 +4167,9 @@ function renderVisitas() {
               +'</div>';
           }).join('')
       )
-      +'<div style="display:flex;justify-content:flex-end;margin-top:8px">'
-      +'<button class="btn btn-sm btn-secondary" onclick="abrirPanelAlumnoDesdeVisitas('+row.alumno_id+','+row.estancia_id+')">Ver ficha completa</button>'
+      +'<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:8px">'
+      +'<button class="btn btn-secondary" style="padding:10px 18px;font-size:14px" onclick="agregarVisitaDesdeListado('+row.alumno_id+','+row.estancia_id+')">+ Añadir visita</button>'
+      +'<button class="btn btn-secondary" style="padding:10px 18px;font-size:14px" onclick="abrirPanelAlumnoDesdeVisitas('+row.alumno_id+','+row.estancia_id+')">Ver ficha completa</button>'
       +'</div>'
       +'</div>'
       +'</div>';
@@ -4153,8 +4179,16 @@ function renderVisitas() {
 function abrirPanelAlumnoDesdeVisitas(alumnoId, estanciaId) {
   switchTab('alumnado');
   setTimeout(() => {
-    abrirPanelAlumno(alumnoId);
+    abrirPanelAlumno(alumnoId, 'estancias');
     setTimeout(() => mostrarFormEstancia(estanciaId), 400);
+  }, 200);
+}
+
+function agregarVisitaDesdeListado(alumnoId, estanciaId) {
+  switchTab('alumnado');
+  setTimeout(() => {
+    abrirPanelAlumno(alumnoId, 'estancias');
+    setTimeout(() => { mostrarFormEstancia(estanciaId); nuevaVisitaRapida(estanciaId); }, 400);
   }, 200);
 }
 
@@ -4184,6 +4218,9 @@ async function arrancarApp(){
   if(btnRol)btnRol.textContent='Cerrar sesion';
   const tabU=document.getElementById('tab-usuarios');
   if(tabU)tabU.style.display=(currentUser.role==='admin'||currentUser.role==='tutor')?'flex':'none';
+  const esAdmin = currentUser.role==='admin';
+  const tabP=document.getElementById('tab-pendientes'); if(tabP)tabP.style.display=esAdmin?'flex':'none';
+  const tabH=document.getElementById('tab-historial');  if(tabH)tabH.style.display=esAdmin?'flex':'none';
   await cargarDatos();
   poblarSelectorSupervisor();
 }
