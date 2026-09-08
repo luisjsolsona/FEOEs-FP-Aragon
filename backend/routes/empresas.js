@@ -12,6 +12,15 @@ function validarCoordenadas(lat, lon) {
   return null;
 }
 
+// La columna cif es NOT NULL UNIQUE en la BD (no se puede cambiar sin reconstruir
+// la tabla en producción). Para permitir empresas sin CIF/NIF conocido, se genera
+// un valor único con este prefijo — el frontend lo reconoce y muestra "Sin CIF/NIF"
+// en vez del propio placeholder.
+const PREFIJO_SIN_CIF = 'SIN-CIF-';
+function generarCifPlaceholder() {
+  return PREFIJO_SIN_CIF + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase();
+}
+
 // GET /api/empresas
 router.get('/', requireAuth, (req, res) => {
   const empresas = db.prepare(`SELECT * FROM empresas WHERE deleted = 0 ORDER BY nombre ASC`).all();
@@ -20,11 +29,24 @@ router.get('/', requireAuth, (req, res) => {
 
 // POST /api/empresas — requiere al menos profe
 router.post('/', requireProfe, (req, res) => {
-  const { nombre, cif, sector, direccion, lat, lon, contacto_nombre, contacto_cargo, contacto_tel, contacto_email, obs } = req.body;
-  if (!nombre || !cif) return res.status(400).json({ error: 'Nombre y CIF son obligatorios.' });
+  let { nombre, cif, sector, direccion, lat, lon, contacto_nombre, contacto_cargo, contacto_tel, contacto_email, obs } = req.body;
+  if (!nombre) return res.status(400).json({ error: 'El nombre de la empresa es obligatorio.' });
 
   const coordError = validarCoordenadas(lat, lon);
   if (coordError) return res.status(400).json({ error: coordError });
+
+  cif = (cif || '').trim();
+  if (!cif) {
+    // Sin CIF/NIF conocido: se crea siempre como registro nuevo con un placeholder
+    // único, nunca se intenta upsert (no hay nada fiable con lo que emparejar).
+    cif = generarCifPlaceholder();
+    const r = db.prepare(`INSERT INTO empresas (nombre, cif, sector, direccion, lat, lon,
+      contacto_nombre, contacto_cargo, contacto_tel, contacto_email, obs)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(nombre, cif, sector||null, direccion||null, lat||null, lon||null,
+           contacto_nombre||null, contacto_cargo||null, contacto_tel||null, contacto_email||null, obs||null);
+    return res.status(201).json({ empresa: { id: r.lastInsertRowid, ...req.body, cif }, sinCif: true });
+  }
 
   // Upsert por CIF
   const exist = db.prepare('SELECT id FROM empresas WHERE cif = ?').get(cif.toUpperCase());

@@ -456,10 +456,11 @@ window.addEventListener('unhandledrejection', function(e) {
     padding: 16px 20px;
     background: var(--white);
     border-bottom: 1px solid var(--gray6);
-    display: flex; justify-content: space-between; align-items: center;
-    cursor: pointer;
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 14px;
   }
-  .empresa-card-header:hover { background: var(--gray7); }
+  .empresa-card-header > div:first-child { flex: 1; min-width: 0; }
+  .empresa-card-header > div:last-child { flex-shrink: 0; }
+  .empresa-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .empresa-name { font-family: 'Crimson Pro', serif; font-size: 17px; font-weight: 600; color: var(--az); }
   .empresa-meta { font-size: 12px; color: var(--gray3); margin-top: 2px; }
   .empresa-alumnos { width: 100%; border-collapse: collapse; }
@@ -709,9 +710,8 @@ window.addEventListener('unhandledrejection', function(e) {
     .modal { width: 95%; padding: 20px 16px; }
     #modalImport > div { width: 98% !important; max-height: 95vh; }
 
-    /* Empresas cards */
-    .empresa-card-header { flex-direction: column; align-items: flex-start; gap: 8px; }
-    .empresa-card-header > div:last-child { width: 100%; justify-content: flex-start; }
+    /* Empresas cards: en móvil los botones ya se ajustan solos (flex-wrap en su propio
+       grupo), no hace falta apilar toda la cabecera en columna */
     .empresa-alumnos td { padding: 6px 10px; font-size: 11px; }
 
     /* Pendientes */
@@ -1624,8 +1624,8 @@ window.addEventListener('unhandledrejection', function(e) {
         </div>
         <div class="form-row col2">
           <div class="form-group">
-            <label>CIF *</label>
-            <input type="text" id="eCif" placeholder="B12345678" class="mono" oninput="autoGuardarEmpresa()">
+            <label>CIF/NIF <span style="font-weight:400;color:var(--gray4);font-size:11px">(opcional)</span></label>
+            <input type="text" id="eCif" placeholder="B12345678 — déjalo en blanco si no lo tienes" class="mono" oninput="autoGuardarEmpresa()">
           </div>
           <div class="form-group">
             <label>Sector / Actividad</label>
@@ -1882,7 +1882,7 @@ function filtrarSelectEmpresa() {
   const empresas = state.empresas.filter(e => !e.deleted && (!q || _normalizarBusqueda(`${e.nombre} ${e.cif}`).includes(q)));
 
   sel.innerHTML = '<option value="" style="color:var(--gray1)">— Seleccionar empresa registrada —</option>'
-    + empresas.map(e=>'<option value="'+e.id+'" style="background:white;color:var(--gray1)">'+escHtml(e.nombre)+' ('+escHtml(e.cif)+')</option>').join('');
+    + empresas.map(e=>'<option value="'+e.id+'" style="background:white;color:var(--gray1)">'+escHtml(e.nombre)+' ('+escHtml(formatCif(e.cif))+')</option>').join('');
   if (empresas.some(e => String(e.id) === String(actual))) sel.value = actual;
 
   if (!sug) return;
@@ -1895,7 +1895,7 @@ function filtrarSelectEmpresa() {
   sug.innerHTML = empresas.slice(0,8).map(e =>
     '<div class="geo-sug-item" onmousedown="seleccionarEmpresaSugerida('+e.id+')">'
       + '<div class="sug-main">'+escHtml(e.nombre)+'</div>'
-      + '<div class="sug-sub mono">'+escHtml(e.cif)+'</div>'
+      + '<div class="sug-sub mono">'+escHtml(formatCif(e.cif))+'</div>'
     + '</div>'
   ).join('');
   sug.style.display = 'block';
@@ -2166,7 +2166,7 @@ function autoGuardarEmpresa() {
   _debounceSave('empresa', async () => {
     const nombre = document.getElementById('eNombre').value.trim();
     const cif    = document.getElementById('eCif').value.trim();
-    if (!nombre || !cif) return;
+    if (!nombre) return;
     const latVal = parseFloat(document.getElementById('eDireccionLat').value) || null;
     const lonVal = parseFloat(document.getElementById('eDireccionLon').value) || null;
     const body = {
@@ -2546,7 +2546,7 @@ function abrirPanelAlumno(id, modo) {
   if (empSel) {
     empSel.innerHTML = '<option value="" style="background:white;color:var(--gray3)">— Seleccionar empresa registrada —</option>'
       + state.empresas.filter(e=>!e.deleted)
-          .map(e=>'<option value="'+e.id+'" style="background:white;color:var(--gray1)">'+escHtml(e.nombre)+' ('+escHtml(e.cif)+')</option>')
+          .map(e=>'<option value="'+e.id+'" style="background:white;color:var(--gray1)">'+escHtml(e.nombre)+' ('+escHtml(formatCif(e.cif))+')</option>')
           .join('');
   }
 
@@ -2788,7 +2788,7 @@ function abrirPanelEmpresa(id) {
     const e = state.empresas.find(x => x.id === id);
     document.getElementById('empresaId').value = e.id;
     document.getElementById('eNombre').value = e.nombre;
-    document.getElementById('eCif').value = e.cif;
+    document.getElementById('eCif').value = (e.cif && e.cif.startsWith('SIN-CIF-')) ? '' : e.cif;
     document.getElementById('eSector').value = e.sector || '';
     document.getElementById('eDireccion').value = e.direccion || '';
     document.getElementById('eContactoNombre').value = e.contactoNombre || '';
@@ -3009,7 +3009,7 @@ function renderEmpresas() {
           <input type="checkbox" class="cb-empresa" data-id="${e.id}" ${seleccionEmpresas.has(e.id)?'checked':''} onchange="toggleSeleccionEmpresa(${e.id},this.checked)" style="margin-top:5px;width:16px;height:16px;flex-shrink:0;cursor:pointer">
           <div>
           <div class="empresa-name">🏢 ${escHtml(e.nombre)}</div>
-          <div class="empresa-meta mono">${escHtml(e.cif)}${e.sector ? ` · ${escHtml(e.sector)}` : ''}${e.direccion ? ` · ${escHtml(e.direccion)}` : '<span style="color:var(--red)"> · Sin dirección</span>'}</div>
+          <div class="empresa-meta mono">${escHtml(formatCif(e.cif))}${e.sector ? ` · ${escHtml(e.sector)}` : ''}${e.direccion ? ` · ${escHtml(e.direccion)}` : '<span style="color:var(--red)"> · Sin dirección</span>'}</div>
           <div class="empresa-meta" style="margin-top:3px">
             ${e.contactoNombre ? `👤 ${escHtml(e.contactoNombre)}${e.contactoCargo?' ('+escHtml(e.contactoCargo)+')':''}` : ''}
             ${e.contactoTel ? `<a href="tel:${esc(e.contactoTel)}" style="margin-left:8px;font-weight:700;color:var(--az);font-size:14px">📞 ${escHtml(e.contactoTel)}</a>` : ''}
@@ -3193,7 +3193,7 @@ const CAMPOS = {
   ],
   empresas: [
     { key:'nombre',         label:'Nombre',            required:true  },
-    { key:'cif',            label:'CIF',               required:true  },
+    { key:'cif',            label:'CIF',               required:false },
     { key:'sector',         label:'Sector',            required:false },
     { key:'direccion',      label:'Dirección',         required:false },
     { key:'contactoNombre', label:'Contacto Nombre',   required:false },
@@ -3609,7 +3609,7 @@ async function exportarEmpresasExcel() {
   const idsFiltradas = new Set(filtradas.map(e=>e.id));
 
   const rows=[['ID','Nombre','CIF','Sector','Direccion','Contacto','Cargo','Telefono','Email','Obs','Estado Prospeccion','Fecha Ultima Gestion','Gestionado Por','N Estancias'],
-    ...filtradas.map(e=>[e.id,e.nombre,e.cif,e.sector,e.direccion,e.contactoNombre,e.contactoCargo,e.contactoTel,e.contactoEmail,e.obs,
+    ...filtradas.map(e=>[e.id,e.nombre,formatCif(e.cif),e.sector,e.direccion,e.contactoNombre,e.contactoCargo,e.contactoTel,e.contactoEmail,e.obs,
       (PROSPECCION_INFO[e.prospeccionEstado]||PROSPECCION_INFO.sin_contactar).label, e.prospeccionFecha||'', e.prospeccionContacto||'',
       state.estancias.filter(s=>!s.deleted&&(s.empresaId===e.id||(!s.empresaId&&s.empresaCif===e.cif))).length])];
 
@@ -3618,7 +3618,7 @@ async function exportarEmpresasExcel() {
     .map(s => {
       const emp = filtradas.find(e => e.id === s.empresaId || (!s.empresaId && s.empresaCif === e.cif));
       const al  = state.alumnado.find(a => a.id === s.alumnoId);
-      return [emp?.nombre||s.empresaNombre||'', emp?.cif||s.empresaCif||'', al?.apellidos||'', al?.nombre||'', al?.dni||'',
+      return [emp?.nombre||s.empresaNombre||'', formatCif(emp?.cif)||s.empresaCif||'', al?.apellidos||'', al?.nombre||'', al?.dni||'',
         s.curso, s.nivel||'', s.periodoIni||'', s.periodoFin||'', s.contacto||'', s.obsEmpresa||'', s.obsAlumno||''];
     });
   const rowsRelacion = [['Empresa','CIF','Apellidos Alumno','Nombre Alumno','DNI','Curso','Nivel','Periodo Inicio','Periodo Fin','Contacto','Obs. Empresa','Obs. Alumno'], ...relacion];
@@ -3809,7 +3809,7 @@ async function guardarEstancia() {
 async function guardarEmpresa() {
   const nombre=document.getElementById('eNombre').value.trim();
   const cif=document.getElementById('eCif').value.trim();
-  if(!nombre||!cif){toast('Nombre y CIF son obligatorios','error');return;}
+  if(!nombre){toast('El nombre de la empresa es obligatorio','error');return;}
   const latVal = parseFloat(document.getElementById('eDireccionLat').value) || null;
   const lonVal = parseFloat(document.getElementById('eDireccionLon').value) || null;
   const body={nombre,cif,
@@ -3979,8 +3979,8 @@ async function ejecutarImport() {
     }
   } else {
     for(const row of importParsed){
-      const nombre=row[getCol('nombre')]?.trim(),cif=row[getCol('cif')]?.trim().toUpperCase();
-      if(!nombre||!cif){om++;continue;}
+      const nombre=row[getCol('nombre')]?.trim(),cif=row[getCol('cif')]?.trim().toUpperCase()||'';
+      if(!nombre){om++;continue;}
       try{const{updated}=await Empresas.create({nombre,cif,sector:row[getCol('sector')]?.trim()||'',direccion:row[getCol('direccion')]?.trim()||'',contacto_nombre:row[getCol('contactoNombre')]?.trim()||'',contacto_cargo:row[getCol('contactoCargo')]?.trim()||'',contacto_tel:row[getCol('contactoTel')]?.trim()||'',contacto_email:row[getCol('contactoEmail')]?.trim()||'',obs:row[getCol('obs')]?.trim()||''});if(updated)ac++;else cr++;}catch{om++;}
     }
   }
@@ -4277,6 +4277,13 @@ async function borrarSeguimiento(id) {
 }
 
 function escHtml(s) { const d=document.createElement('div');d.textContent=s||'';return d.innerHTML; }
+
+// El backend genera un CIF-placeholder (prefijo SIN-CIF-) para empresas creadas sin
+// CIF/NIF conocido, ya que la columna es NOT NULL UNIQUE en la base de datos. Aquí
+// se muestra siempre como "Sin CIF/NIF" en vez del valor interno.
+function formatCif(cif) {
+  return (cif && cif.startsWith('SIN-CIF-')) ? 'Sin CIF/NIF' : (cif || '');
+}
 
 // ══════════════════════════════════════════
 //  VISTA VISITAS
@@ -4837,7 +4844,7 @@ function buildPopupHTML(emp, alumnosActuales, alumnosHistorico, curso) {
   let html = `<div class="emp-popup">
     <div class="emp-popup-header">
       <div class="emp-popup-name">🏢 ${escHtml(emp.nombre)}</div>
-      <div class="emp-popup-meta">${escHtml(emp.cif)}${emp.sector ? ' · ' + escHtml(emp.sector) : ''}</div>
+      <div class="emp-popup-meta">${escHtml(formatCif(emp.cif))}${emp.sector ? ' · ' + escHtml(emp.sector) : ''}</div>
     </div>`;
 
   if (emp.direccion) {
