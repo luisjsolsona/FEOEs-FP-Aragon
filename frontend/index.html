@@ -1761,6 +1761,9 @@ window.addEventListener('unhandledrejection', function(e) {
           <div id="mappingGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"></div>
         </div>
 
+        <!-- Aviso de identificadores duplicados dentro del propio fichero -->
+        <div id="importDupWarning" style="display:none;margin-bottom:14px;background:#FFF4E0;border:1.5px solid #e0c060;border-radius:6px;padding:12px"></div>
+
         <!-- Tabla preview -->
         <div style="font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--gray3);margin-bottom:6px">Vista previa (primeras 5 filas)</div>
         <div style="overflow:auto;max-height:180px;border:var(--border);border-radius:6px">
@@ -3344,14 +3347,50 @@ function mostrarPreview() {
   const grid = document.getElementById('mappingGrid');
   grid.innerHTML = campos.map(c => `
     <div class="map-label ${c.required?'required':''}">${c.label}</div>
-    <select class="map-select ${autoMap[c.key]?'matched':'unmatched'}" id="map_${c.key}" onchange="this.className='map-select '+(this.value?'matched':'unmatched')">
+    <select class="map-select ${autoMap[c.key]?'matched':'unmatched'}" id="map_${c.key}" onchange="this.className='map-select '+(this.value?'matched':'unmatched');verificarDuplicadosImport()">
       <option value="">— sin mapear —</option>
       ${importHeaders.map(h=>`<option value="${h}" ${h===autoMap[c.key]?'selected':''}>${h}</option>`).join('')}
     </select>
   `).join('');
 
   renderPreviewTable();
+  verificarDuplicadosImport();
   validarImport();
+}
+
+// Comprueba si el identificador clave (CIF en empresas, DNI en alumnado) se repite
+// dentro del propio fichero. Como la importación hace upsert por ese campo, un
+// identificador repetido hace que una fila sobrescriba a la anterior en vez de
+// sumarse — es la causa más habitual de "he importado 124 filas y solo veo 24".
+function verificarDuplicadosImport() {
+  const box = document.getElementById('importDupWarning');
+  if (!box) return;
+  const clave = importTipo === 'alumnado' ? 'dni' : 'cif';
+  const etiqueta = importTipo === 'alumnado' ? 'DNI/NIE' : 'CIF';
+  const col = document.getElementById('map_'+clave)?.value;
+  if (!col) { box.style.display = 'none'; return; }
+
+  const conteo = {};
+  importParsed.forEach(row => {
+    const v = (row[col]||'').trim().toUpperCase();
+    if (v) conteo[v] = (conteo[v]||0) + 1;
+  });
+  const duplicados = Object.entries(conteo).filter(([,n]) => n > 1);
+  const filasEnDuplicados = duplicados.reduce((s,[,n])=>s+n, 0);
+
+  if (!duplicados.length) { box.style.display = 'none'; return; }
+
+  box.style.display = 'block';
+  box.innerHTML = `
+    <div style="font-size:13px;font-weight:700;color:#8B6000;margin-bottom:4px">⚠️ ${duplicados.length} ${etiqueta} repetido(s) en el fichero (${filasEnDuplicados} filas afectadas)</div>
+    <div style="font-size:12px;color:var(--gray2);margin-bottom:6px">
+      Como cada fila se guarda por ${etiqueta}, las filas que comparten uno se sustituyen entre sí en vez de sumarse — al final quedarán menos registros de los que esperas.
+      Si son la misma empresa/alumno con datos distintos en cada fila (p. ej. dos periodos de prácticas), es normal y solo se quedará la última fila. Si son registros distintos, revisa el ${etiqueta} en el fichero antes de continuar.
+    </div>
+    <div style="font-size:11px;color:var(--gray3);font-family:var(--mono)">
+      ${duplicados.slice(0,8).map(([v,n])=>`${escHtml(v)} (${n}×)`).join(' · ')}${duplicados.length>8?' · …':''}
+    </div>
+  `;
 }
 
 function renderPreviewTable() {
