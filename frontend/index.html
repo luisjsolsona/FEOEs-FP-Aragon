@@ -990,7 +990,8 @@ window.addEventListener('unhandledrejection', function(e) {
   <!-- ── VISTA EMPRESAS ── -->
   <div id="view-empresas">
     <div class="toolbar">
-      <div class="search-wrap">
+      <span id="empresasResultCount" style="font-size:13px;font-weight:700;color:var(--az);background:var(--az-light);padding:7px 14px;border-radius:20px;white-space:nowrap">0 empresas</span>
+      <div class="search-wrap" style="flex:0 0 240px;min-width:0">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <input type="text" id="searchEmpresa" placeholder="Buscar empresa, CIF, contacto…" oninput="renderEmpresas()">
       </div>
@@ -3025,11 +3026,20 @@ function renderEmpresas() {
   const fProsp = selProsp?.value || '';
 
   let empresas = state.empresas.filter(e => !e.deleted);
+  const totalEmpresas = empresas.length;
   if (q) {
     empresas = empresas.filter(e => `${e.nombre} ${e.cif} ${e.contactoNombre} ${e.contactoEmail} ${e.sector}`.toLowerCase().includes(q));
   }
   if (fProsp) {
     empresas = empresas.filter(e => (e.prospeccionEstado || 'sin_contactar') === fProsp);
+  }
+
+  const countEl = document.getElementById('empresasResultCount');
+  if (countEl) {
+    const hayFiltro = !!(q || fProsp);
+    countEl.textContent = hayFiltro
+      ? `${empresas.length} de ${totalEmpresas} empresa${totalEmpresas!==1?'s':''}`
+      : `${totalEmpresas} empresa${totalEmpresas!==1?'s':''}`;
   }
 
   if (!empresas.length) {
