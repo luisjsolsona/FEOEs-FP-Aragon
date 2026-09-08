@@ -456,10 +456,10 @@ window.addEventListener('unhandledrejection', function(e) {
     padding: 16px 20px;
     background: var(--white);
     border-bottom: 1px solid var(--gray6);
-    display: flex; justify-content: space-between; align-items: flex-start; gap: 14px;
+    display: flex; flex-wrap: nowrap; justify-content: space-between; align-items: flex-start; gap: 14px;
   }
-  .empresa-card-header > div:first-child { flex: 1; min-width: 0; }
-  .empresa-card-header > div:last-child { flex-shrink: 0; }
+  .empresa-card-header > div:first-child { flex: 1 1 auto; min-width: 0; }
+  .empresa-card-header > div:last-child { flex: 0 0 auto; }
   .empresa-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .empresa-name { font-family: 'Crimson Pro', serif; font-size: 17px; font-weight: 600; color: var(--az); }
   .empresa-meta { font-size: 12px; color: var(--gray3); margin-top: 2px; }
