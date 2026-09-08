@@ -1730,6 +1730,9 @@ window.addEventListener('unhandledrejection', function(e) {
       <button id="btnPlantillaCsv"  class="btn btn-sm btn-ghost"      onclick="descargarPlantilla('csv')">⬇ CSV (.csv)</button>
       <span style="font-size:11px;color:var(--gray3);margin-left:4px">Rellena la plantilla y súbela aquí</span>
     </div>
+    <div id="importNotaAlumnado" style="display:none;padding:8px 24px;background:#EAF2FF;font-size:12px;color:var(--az);border-bottom:var(--border)">
+      💡 Las columnas de Curso, Nivel, Empresa y Periodo son opcionales — puedes importar solo los datos personales del alumnado y asignar la empresa más tarde a mano desde su ficha.
+    </div>
 
     <!-- Drop zone -->
     <div style="padding:20px 24px;overflow-y:auto;flex:1;min-height:0">
@@ -3180,7 +3183,7 @@ const CAMPOS = {
     { key:'fechaNacimiento', label:'Fecha de nacimiento', required:false },
     { key:'telefono1',     label:'Teléfono 1',           required:false },
     { key:'telefono2',     label:'Teléfono 2',           required:false },
-    { key:'curso',         label:'Curso académico',      required:true  },
+    { key:'curso',         label:'Curso académico',      required:false },
     { key:'nivel',         label:'Nivel / Ciclo',        required:false },
     { key:'empresaNombre', label:'Empresa',              required:false },
     { key:'empresaCif',    label:'CIF',                  required:false },
@@ -3237,6 +3240,8 @@ function abrirImport(tipo) {
   importTipo = tipo;
   document.getElementById('importTitle').textContent = tipo === 'alumnado' ? '📥 Importar alumnado' : '📥 Importar empresas';
   document.getElementById('importSubtitle').textContent = `Formatos admitidos: .xlsx, .xls, .csv — ${tipo === 'alumnado' ? 'Alumnado FEOE' : 'Empresas FEOE'}`;
+  const notaAlumnado = document.getElementById('importNotaAlumnado');
+  if (notaAlumnado) notaAlumnado.style.display = tipo === 'alumnado' ? 'block' : 'none';
   resetImport();
   document.getElementById('modalImport').style.display = 'flex';
 }
@@ -3448,11 +3453,12 @@ function descargarPlantilla(formato) {
     alumnado: [
       ['García López','Carlos','12345678A','2007-04-12','600111222','','2025-2026','2CFGM','Mi Empresa S.L.','B12345678','2026-03-02','2026-06-19','Ana Pérez — 976 000 000','Soporte técnico','Buen rendimiento',''],
       ['Martínez Sanz','Laura','23456789B','2006-11-30','600333444','976555666','2025-2026','2CFGS','Otra Empresa S.A.','A87654321','2026-03-02','2026-06-19','Juan García — 976 111 222','','',''],
+      ['Ruiz Gómez','Marta','34567890C','2007-01-20','600777888','','','','','','','','','','','Sin estancia todavía — se puede asignar la empresa más tarde desde la ficha'],
     ],
     empresas: [['Mi Empresa S.L.','B12345678','Informática','C/ Ejemplo 1 Zaragoza','Ana Pérez','Tutora empresa','976 000 000','aperez@empresa.com','Primera colaboración']]
   };
   const notaValidacion = isAlumnado
-    ? ['','','','AAAA-MM-DD','','','2025-2026','Valores: 1CFGB / 2CFGB / 1CFGM / 2CFGM / 1CFGS / 2CFGS / CE','','','AAAA-MM-DD','AAAA-MM-DD','','','','']
+    ? ['','','','AAAA-MM-DD','','','2025-2026 (opcional)','1CFGB/2CFGB/1CFGM/2CFGM/1CFGS/2CFGS/CE','','','AAAA-MM-DD','AAAA-MM-DD','','','','']
     : null;
 
   if (formato === 'csv') {
