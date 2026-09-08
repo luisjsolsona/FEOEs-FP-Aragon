@@ -766,6 +766,23 @@ window.addEventListener('unhandledrejection', function(e) {
   .btn-sel-danger:hover { background: #cc0000; }
   .btn-sel-cancel { background: rgba(255,255,255,0.15); color: white; border: 1px solid rgba(255,255,255,0.3); padding: 7px 14px; border-radius: var(--radius); font-family: var(--font); font-size: 13px; cursor: pointer; }
   .btn-sel-cancel:hover { background: rgba(255,255,255,0.25); }
+  .btn-sel-action { background: var(--gold); color: var(--az); border: none; padding: 7px 14px; border-radius: var(--radius); font-family: var(--font); font-size: 13px; font-weight: 700; cursor: pointer; display:flex; align-items:center; gap:6px; }
+  .btn-sel-action:hover { background: var(--gold-light); }
+  #seleccionBarEmpresas {
+    display: none;
+    position: sticky; bottom: 0; left: 0; right: 0;
+    background: var(--az); color: white;
+    padding: 12px 24px;
+    align-items: center; gap: 12px;
+    z-index: 90;
+    box-shadow: 0 -4px 16px rgba(26,39,68,0.3);
+    border-radius: 8px 8px 0 0;
+    border-top: 3px solid var(--gold);
+    animation: slideUp 0.2s ease;
+  }
+  #seleccionBarEmpresas.visible { display: flex; }
+  #seleccionBarEmpresas .sel-count { font-size: 13px; font-weight: 700; background: rgba(255,255,255,0.2); padding: 3px 12px; border-radius: 20px; font-family: var(--mono); }
+  #seleccionBarEmpresas .sel-label { font-size: 13px; opacity: 0.85; flex: 1; }
 
   @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -1019,6 +1036,13 @@ window.addEventListener('unhandledrejection', function(e) {
       </button>
     </div>
     <div id="empresasContainer"></div>
+    <!-- Barra de selección múltiple para cambiar prospección en bloque -->
+    <div id="seleccionBarEmpresas">
+      <span class="sel-count" id="selCountEmpresas">0</span>
+      <span class="sel-label">empresa(s) seleccionada(s)</span>
+      <button class="btn-sel-cancel" onclick="limpiarSeleccionEmpresas()">✕ Cancelar</button>
+      <button class="btn-sel-action" onclick="abrirModalProspeccionMasiva()">📋 Cambiar prospección</button>
+    </div>
   </div>
 
   <!-- ── VISTA PENDIENTES ── -->
@@ -1532,6 +1556,30 @@ window.addEventListener('unhandledrejection', function(e) {
     </div>
     <div class="panel-footer">
       <button class="btn btn-ghost" onclick="cerrarModalProspeccion()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL PROSPECCIÓN MASIVA (empresas seleccionadas) ── -->
+<div class="overlay" id="overlayProspeccionMasiva" onclick="if(event.target===this)cerrarModalProspeccionMasiva()">
+  <div class="panel" id="panelProspeccionMasiva" style="max-width:640px">
+    <div class="panel-header">
+      <div>
+        <h2>📋 Cambiar prospección en bloque</h2>
+        <small><span id="prospMasivaCount">0</span> empresa(s) seleccionada(s)</small>
+      </div>
+      <button class="close-btn" onclick="cerrarModalProspeccionMasiva()">✕</button>
+    </div>
+    <div class="panel-body" style="padding:20px 24px">
+      <div class="form-section">
+        <div class="form-section-title">Nuevo estado para todas</div>
+        <div id="prospMasivaBotones" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px"></div>
+        <label>Nota (opcional, se añadirá igual en el histórico de cada una)</label>
+        <textarea id="prospMasivaNota" placeholder="Ej. Contactadas en la reunión de coordinación de prácticas del 10 de septiembre…" style="width:100%;box-sizing:border-box;min-height:70px"></textarea>
+      </div>
+    </div>
+    <div class="panel-footer">
+      <button class="btn btn-ghost" onclick="cerrarModalProspeccionMasiva()">Cancelar</button>
     </div>
   </div>
 </div>
@@ -2328,6 +2376,68 @@ function esc(s) { const d=document.createElement('div'); d.textContent=s||''; re
 //  SELECCIÓN MÚLTIPLE (solo admin)
 // ══════════════════════════════════════════
 let seleccion = new Set(); // ids de alumnos seleccionados (de la vista actual)
+let seleccionEmpresas = new Set(); // ids de empresas seleccionadas, para cambiar prospección en bloque
+
+function toggleSeleccionEmpresa(id, checked) {
+  if (checked) seleccionEmpresas.add(id); else seleccionEmpresas.delete(id);
+  actualizarBarraSeleccionEmpresas();
+}
+
+function actualizarBarraSeleccionEmpresas() {
+  const bar = document.getElementById('seleccionBarEmpresas');
+  const cnt = document.getElementById('selCountEmpresas');
+  if (!bar) return;
+  if (seleccionEmpresas.size > 0) {
+    bar.classList.add('visible');
+    cnt.textContent = seleccionEmpresas.size;
+  } else {
+    bar.classList.remove('visible');
+  }
+}
+
+function limpiarSeleccionEmpresas() {
+  seleccionEmpresas.clear();
+  document.querySelectorAll('.cb-empresa').forEach(cb => cb.checked = false);
+  actualizarBarraSeleccionEmpresas();
+}
+
+// Cambiar el estado de prospección de todas las empresas seleccionadas a la vez.
+function abrirModalProspeccionMasiva() {
+  if (!seleccionEmpresas.size) return;
+  document.getElementById('prospMasivaCount').textContent = seleccionEmpresas.size;
+  document.getElementById('prospMasivaNota').value = '';
+  const cont = document.getElementById('prospMasivaBotones');
+  cont.innerHTML = Object.entries(PROSPECCION_INFO).map(([key,info]) => `
+    <button type="button" onclick="marcarProspeccionMasiva('${key}')"
+      style="display:inline-flex;align-items:center;gap:5px;border-radius:20px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer;
+        border:1.5px solid ${info.color};background:white;color:${info.color}">
+      ${info.icon} ${info.label}
+    </button>`).join('');
+  document.getElementById('overlayProspeccionMasiva')?.classList.add('open');
+}
+
+function cerrarModalProspeccionMasiva() {
+  document.getElementById('overlayProspeccionMasiva')?.classList.remove('open');
+}
+
+async function marcarProspeccionMasiva(estado) {
+  const nota = document.getElementById('prospMasivaNota')?.value.trim() || null;
+  const ids = [...seleccionEmpresas];
+  cerrarModalProspeccionMasiva();
+  toast('Actualizando '+ids.length+' empresa(s)…', 'info');
+  let ok = 0, fail = 0;
+  for (const id of ids) {
+    try {
+      const r = await Empresas.prospeccion(id, { estado, nota });
+      const emp = state.empresas.find(e => e.id === id);
+      if (emp) { emp.prospeccionEstado = r.prospeccion_estado; emp.prospeccionFecha = r.prospeccion_fecha; emp.prospeccionContacto = r.prospeccion_contacto; }
+      ok++;
+    } catch { fail++; }
+  }
+  limpiarSeleccionEmpresas();
+  renderEmpresas();
+  toast(`Prospección actualizada en ${ok} empresa(s)`+(fail?` — ${fail} con error`:''), fail ? 'warning' : 'success');
+}
 
 function toggleSelRow(id, cb) {
   if (cb.checked) seleccion.add(id);
@@ -2892,13 +3002,17 @@ function renderEmpresas() {
     return `
     <div class="empresa-card">
       <div class="empresa-card-header">
-        <div>
+        <div style="display:flex;align-items:flex-start;gap:10px">
+          <input type="checkbox" class="cb-empresa" data-id="${e.id}" ${seleccionEmpresas.has(e.id)?'checked':''} onchange="toggleSeleccionEmpresa(${e.id},this.checked)" style="margin-top:5px;width:16px;height:16px;flex-shrink:0;cursor:pointer">
+          <div>
           <div class="empresa-name">🏢 ${escHtml(e.nombre)}</div>
           <div class="empresa-meta mono">${escHtml(e.cif)}${e.sector ? ` · ${escHtml(e.sector)}` : ''}${e.direccion ? ` · ${escHtml(e.direccion)}` : '<span style="color:var(--red)"> · Sin dirección</span>'}</div>
           <div class="empresa-meta" style="margin-top:3px">
             ${e.contactoNombre ? `👤 ${escHtml(e.contactoNombre)}${e.contactoCargo?' ('+escHtml(e.contactoCargo)+')':''}` : ''}
             ${e.contactoTel ? `<a href="tel:${esc(e.contactoTel)}" style="margin-left:8px;font-weight:700;color:var(--az);font-size:14px">📞 ${escHtml(e.contactoTel)}</a>` : ''}
           </div>
+          </div>
+        </div>
         </div>
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end">
           ${mapaBadge}
