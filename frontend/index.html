@@ -839,6 +839,12 @@ window.addEventListener('unhandledrejection', function(e) {
           <div style="height:1px;background:var(--gray6);margin:4px 0"></div>
           <!-- Zona peligrosa — solo admin -->
           <div style="padding:7px 14px 4px;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--red)">Zona peligrosa</div>
+          <button class="menu-item" style="color:var(--red)" onclick="borrarTodasLasEmpresas()">
+            <span style="width:20px;text-align:center">🏢</span> Borrar todas las empresas
+          </button>
+          <button class="menu-item" style="color:var(--red)" onclick="borrarTodoElAlumnado()">
+            <span style="width:20px;text-align:center">👤</span> Borrar todo el alumnado
+          </button>
           <button class="menu-item" style="color:var(--red)" onclick="borrarTodosLosDatos()">
             <span style="width:20px;text-align:center">🗑️</span> Borrar todos los datos
           </button>
@@ -3493,6 +3499,56 @@ async function exportarEmpresasExcel() {
   XLSX.writeFile(wb,'Empresas-FEOE_empresas_'+new Date().toISOString().slice(0,10)+'.xlsx');
   toast('Excel exportado: '+filtradas.length+' empresas, '+relacion.length+' estancias'+(historialTodos.length?', '+historialTodos.length+' gestiones de prospección':''),'success');
 }
+async function borrarTodasLasEmpresas() {
+  cerrarMenuDatos();
+  const n = state.empresas.filter(e=>!e.deleted).length;
+  confirmar(
+    '⚠️ Borrar todas las empresas',
+    'Esta acción eliminará las ' + n + ' empresa(s) registradas y su histórico de prospección.\n\nLas estancias de alumnado NO se borran: conservan el nombre y CIF de la empresa como texto, pero pierden el enlace a la ficha de empresa.\n\nEsta operación NO se puede deshacer.\n\n¿Estás seguro de que quieres continuar?',
+    () => {
+      confirmar(
+        '🗑️ Confirmación final',
+        'Segunda y última confirmación.\n\nSe borrarán permanentemente todas las empresas y su prospección. ¿Confirmas el borrado?',
+        async () => {
+          try {
+            await window.apiFetch('/admin/reset-empresas', { method: 'DELETE' });
+            await cargarDatos();
+            addHistorial('edit', 'Borrado total de empresas realizado por ' + (currentUser?.username || 'admin'));
+            toast('Todas las empresas han sido eliminadas', 'success');
+          } catch(e) {
+            toast('Error al borrar empresas: ' + e.message, 'error');
+          }
+        }
+      );
+    }
+  );
+}
+
+async function borrarTodoElAlumnado() {
+  cerrarMenuDatos();
+  const n = state.alumnado.filter(a=>!a.deleted).length;
+  confirmar(
+    '⚠️ Borrar todo el alumnado',
+    'Esta acción eliminará los ' + n + ' alumno(s) registrados, junto con todas sus estancias y visitas de seguimiento asociadas.\n\nLas empresas NO se borran.\n\nEsta operación NO se puede deshacer.\n\n¿Estás seguro de que quieres continuar?',
+    () => {
+      confirmar(
+        '🗑️ Confirmación final',
+        'Segunda y última confirmación.\n\nSe borrará permanentemente todo el alumnado, sus estancias y sus visitas. ¿Confirmas el borrado?',
+        async () => {
+          try {
+            await window.apiFetch('/admin/reset-alumnado', { method: 'DELETE' });
+            await cargarDatos();
+            addHistorial('edit', 'Borrado total de alumnado realizado por ' + (currentUser?.username || 'admin'));
+            toast('Todo el alumnado ha sido eliminado', 'success');
+          } catch(e) {
+            toast('Error al borrar alumnado: ' + e.message, 'error');
+          }
+        }
+      );
+    }
+  );
+}
+
 async function borrarTodosLosDatos() {
   cerrarMenuDatos();
   confirmar(

@@ -21,6 +21,22 @@ router.delete('/reset', requireAuth, requireAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
+// DELETE /api/admin/reset-empresas — borra solo empresas (solo admin)
+router.delete('/reset-empresas', requireAuth, requireAdmin, (req, res) => {
+  db.prepare('DELETE FROM empresas').run();
+  db.prepare("DELETE FROM pendientes WHERE tipo = 'empresa'").run();
+  db.prepare("DELETE FROM sqlite_sequence WHERE name IN ('empresas','prospeccion_historial')").run();
+  res.json({ ok: true });
+});
+
+// DELETE /api/admin/reset-alumnado — borra solo alumnado (solo admin)
+router.delete('/reset-alumnado', requireAuth, requireAdmin, (req, res) => {
+  db.prepare('DELETE FROM alumnado').run();
+  db.prepare("DELETE FROM pendientes WHERE tipo IN ('alumno','estancia')").run();
+  db.prepare("DELETE FROM sqlite_sequence WHERE name IN ('alumnado','estancias','seguimientos')").run();
+  res.json({ ok: true });
+});
+
 // GET /api/admin/backup — solo admin. Vuelca TODAS las tablas tal cual están en la BD
 // (usuarios incluidos, con su hash de contraseña — el fichero resultante debe tratarse
 // como sensible, no compartirse por canales inseguros).
