@@ -4920,7 +4920,7 @@ function renderMapaMarkers() {
     marker.bindPopup(popupHTML, { maxWidth: 340, minWidth: 280 });
     marker.on('popupopen', () => {
       const btnEst = document.querySelector('.emp-popup-btn-estancias');
-      if (btnEst) btnEst.onclick = () => { marker.closePopup(); switchTab('empresas'); abrirModalEstanciasEmpresa(emp.id); };
+      if (btnEst) btnEst.onclick = () => { marker.closePopup(); abrirModalEstanciasEmpresa(emp.id); };
       const btnEdit = document.querySelector('.emp-popup-btn-editar');
       if (btnEdit) btnEdit.onclick = () => { marker.closePopup(); abrirPanelEmpresa(emp.id); };
     });
