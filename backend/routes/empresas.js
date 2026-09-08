@@ -130,6 +130,17 @@ router.put('/:empresaId/prospeccion-historial/:histId', requireProfe, (req, res)
   res.json({ ok: true });
 });
 
+// DELETE /api/empresas/:empresaId/prospeccion-historial/:histId — solo admin, una vez puesta
+// una gestión de prospección queda protegida: ni el propio autor puede borrarla, solo admin.
+router.delete('/:empresaId/prospeccion-historial/:histId', requireAdmin, (req, res) => {
+  const empresaId = parseInt(req.params.empresaId);
+  const histId = parseInt(req.params.histId);
+  const h = db.prepare('SELECT * FROM prospeccion_historial WHERE id = ? AND empresa_id = ? AND deleted = 0').get(histId, empresaId);
+  if (!h) return res.status(404).json({ error: 'Entrada de histórico no encontrada.' });
+  db.prepare(`UPDATE prospeccion_historial SET deleted=1, updated_at=datetime('now') WHERE id=?`).run(histId);
+  res.json({ ok: true });
+});
+
 // DELETE /api/empresas/:id — solo admin
 router.delete('/:id', requireAdmin, (req, res) => {
   db.prepare(`UPDATE empresas SET deleted=1, updated_at=datetime('now') WHERE id=?`).run(parseInt(req.params.id));

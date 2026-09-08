@@ -48,6 +48,7 @@ const Empresas = {
   prospeccion: (id, b) => window.apiFetch(`/empresas/${id}/prospeccion`, { method: 'PUT', body: b }),
   prospeccionHistorial: (id) => window.apiFetch(`/empresas/${id}/prospeccion-historial`),
   prospeccionHistorialEditar: (empresaId, histId, b) => window.apiFetch(`/empresas/${empresaId}/prospeccion-historial/${histId}`, { method: 'PUT', body: b }),
+  prospeccionHistorialBorrar: (empresaId, histId) => window.apiFetch(`/empresas/${empresaId}/prospeccion-historial/${histId}`, { method: 'DELETE' }),
 };
 
 const Alumnado = {
@@ -2877,7 +2878,10 @@ function renderHistorialProspeccionModal(empresaId, historial) {
     return `<div style="background:var(--gray7);border:1px solid var(--gray6);border-radius:6px;padding:10px;margin-bottom:8px">
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-bottom:5px">
         <span style="display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:700;color:${info.color}">${info.icon} ${info.label}</span>
-        <span style="font-size:11px;color:var(--gray4)">🧑‍🏫 ${escHtml(h.autor_nombre||'—')} · ${new Date(h.created_at).toLocaleDateString('es-ES')}</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:11px;color:var(--gray4)">🧑‍🏫 ${escHtml(h.autor_nombre||'—')} · ${new Date(h.created_at).toLocaleDateString('es-ES')}</span>
+          ${isAdmin() ? `<button type="button" title="Borrar esta entrada del histórico (solo admin)" onclick="borrarHistorialProspeccion(${empresaId},${h.id})" style="border:none;background:none;color:var(--red);cursor:pointer;font-size:13px;padding:2px">🗑</button>` : ''}
+        </div>
       </div>
       ${esPropia
         ? `<textarea style="width:100%;box-sizing:border-box;min-height:50px;font-size:12px;background:white" placeholder="Sin nota" onblur="guardarNotaHistorial(${empresaId},${h.id},this)">${escHtml(h.nota||'')}</textarea>`
@@ -2903,6 +2907,20 @@ function guardarNotaHistorial(empresaId, histId, textarea) {
     if (entry) entry.nota = nota;
     toast('Nota actualizada','success');
   }).catch(err => toast('Error al guardar la nota: '+err.message,'error'));
+}
+
+// Borrado de una entrada del histórico de prospección — solo admin, incluso si la
+// nota es de otro docente (una vez registrada, solo admin puede quitarla).
+function borrarHistorialProspeccion(empresaId, histId) {
+  confirmar('🗑️ Borrar entrada del histórico', 'Esta gestión de prospección se eliminará permanentemente. ¿Confirmas?', () => {
+    Empresas.prospeccionHistorialBorrar(empresaId, histId).then(() => {
+      const hist = state._prospHist?.[empresaId];
+      if (hist) state._prospHist[empresaId] = hist.filter(h => h.id !== histId);
+      renderHistorialProspeccionModal(empresaId, state._prospHist[empresaId] || []);
+      addHistorial('del', 'Entrada de histórico de prospección borrada (empresa #'+empresaId+')');
+      toast('Entrada borrada', 'success');
+    }).catch(err => toast('Error al borrar: '+err.message, 'error'));
+  });
 }
 
 // Abre la modal de Estancias de una empresa: alumnado por curso, de solo lectura.
