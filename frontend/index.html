@@ -246,15 +246,15 @@ window.addEventListener('unhandledrejection', function(e) {
     transition: border-color 0.15s;
   }
   .search-wrap input:focus { border-color: var(--az2); box-shadow: 0 0 0 3px var(--az-light); }
-  select, input[type="text"], input[type="date"], textarea {
+  select, input[type="text"], input[type="date"], input[type="password"], textarea {
     font-family: var(--font);
-    font-size: 14px;
+    font-size: 16px;
   }
   .filter-select {
     padding: 8px 12px;
     border: 1.5px solid var(--gray5);
     border-radius: 6px;
-    font-size: 14px;
+    font-size: 16px;
     font-family: var(--font);
     outline: none;
     background: var(--white);
@@ -380,7 +380,8 @@ window.addEventListener('unhandledrejection', function(e) {
     position: sticky; top: 0; z-index: 10;
     flex-shrink: 0;
   }
-  .panel-header h2 { font-family: 'Crimson Pro', serif; font-size: 20px; font-weight: 600; }
+  .panel-header > div:first-child { min-width: 0; flex: 1 1 auto; }
+  .panel-header h2 { font-family: 'Crimson Pro', serif; font-size: 20px; font-weight: 600; overflow-wrap: break-word; }
   .panel-header small { font-size: 12px; opacity: 0.7; display: block; margin-top: 4px; font-family: 'DM Sans', sans-serif; }
   .close-btn {
     background: rgba(255,255,255,0.15);
@@ -593,7 +594,7 @@ window.addEventListener('unhandledrejection', function(e) {
   .map-row { display:contents; }
   .map-label { font-size:11px; font-weight:600; color:var(--gray2); display:flex; align-items:center; gap:4px; }
   .map-label.required::after { content:"*"; color:var(--red); margin-left:2px; }
-  .map-select { padding:5px 8px; border:var(--border); border-radius:var(--radius); font-size:12px; font-family:var(--font); width:100%; outline:none; }
+  .map-select { padding:5px 8px; border:var(--border); border-radius:var(--radius); font-size:16px; font-family:var(--font); width:100%; outline:none; }
   .map-select:focus { border-color:var(--az); }
   .map-select.matched { border-color:var(--green); background:var(--green-light); }
   .map-select.unmatched { border-color:var(--gold); background:var(--gold-light); }
@@ -664,12 +665,12 @@ window.addEventListener('unhandledrejection', function(e) {
 
   /* Header compacto en móvil */
   @media (max-width: 640px) {
-    header { height: auto; padding: 8px 12px; flex-wrap: wrap; gap: 6px; }
-    .header-left { flex: 1; min-width: 0; }
-    header h1 { font-size: 13px; }
-    header small { display: none; }
-    .logo-badge { font-size: 10px; padding: 2px 6px; }
-    .user-info { gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+    header { height: auto; padding: 8px 12px; flex-wrap: wrap; gap: 4px; }
+    .header-left { flex: 1 1 100%; min-width: 0; }
+    .logo-badge { display: none; }
+    header h1 { font-size: 11px; font-weight: 600; letter-spacing: 0.01em; }
+    header small { display: inline; font-size: 11px; }
+    .user-info { flex: 1 1 100%; gap: 6px; flex-wrap: wrap; justify-content: flex-start; }
     #saveIndicator { display: none !important; }
     .role-badge { display: none; }
 
@@ -690,7 +691,7 @@ window.addEventListener('unhandledrejection', function(e) {
     /* Toolbar: columna completa */
     .toolbar { padding: 10px 10px; gap: 8px; }
     .toolbar .search-wrap { min-width: 100%; order: -1; }
-    .filter-select { flex: 1; min-width: calc(50% - 4px); font-size: 12px; padding: 7px 8px; }
+    .filter-select { flex: 1; min-width: calc(50% - 4px); font-size: 16px; padding: 7px 8px; }
     .toolbar .btn { flex: 1; justify-content: center; font-size: 12px; padding: 8px 10px; }
 
     /* Tabla: ocultar columnas y usar tarjetas virtuales */
@@ -731,6 +732,13 @@ window.addEventListener('unhandledrejection', function(e) {
        sin que el listado le quite sitio ni interfiera con el scroll */
     #mapaSidebar { display: none !important; }
     #mapaContainer { height: 65vh !important; min-height: 320px !important; }
+
+    /* Tarjeta de empresa: la cabecera tenía flex-wrap:nowrap fijo, así que en
+       pantallas estrechas el bloque de botones (mapa, prospección, estancias,
+       editar, borrar) se quedaba forzado en la misma fila que el nombre,
+       provocando solapes de texto y botones. En móvil se apila debajo. */
+    .empresa-card-header { flex-wrap: wrap; }
+    .empresa-card-header > div:last-child { flex: 1 1 100%; justify-content: flex-start; }
   }
 
   @media (min-width: 641px) and (max-width: 900px) {
@@ -997,20 +1005,20 @@ window.addEventListener('unhandledrejection', function(e) {
 
   <!-- ── VISTA EMPRESAS ── -->
   <div id="view-empresas">
-    <div class="toolbar" style="flex-wrap:nowrap">
+    <div class="toolbar">
       <span id="empresasResultCount" style="flex-shrink:0;font-size:13px;font-weight:700;color:var(--az);background:var(--az-light);padding:7px 14px;border-radius:20px;white-space:nowrap">0 empresas</span>
       <div class="search-wrap" style="flex:1 1 auto;min-width:0">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <input type="text" id="searchEmpresa" placeholder="Buscar empresa, CIF, contacto…" oninput="renderEmpresas()">
       </div>
-      <select class="filter-select" id="filterProspeccion" onchange="renderEmpresas()" style="flex-shrink:0">
+      <select class="filter-select" id="filterProspeccion" onchange="renderEmpresas()">
         <option value="">Todos los estados de prospección</option>
       </select>
-      <button class="btn btn-secondary" style="flex-shrink:0" onclick="abrirImport('empresas')">
+      <button class="btn btn-secondary" onclick="abrirImport('empresas')">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         Importar
       </button>
-      <button class="btn btn-primary" style="flex-shrink:0" onclick="abrirPanelEmpresa(null)">
+      <button class="btn btn-primary" onclick="abrirPanelEmpresa(null)">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         Nueva empresa
       </button>
@@ -1423,7 +1431,7 @@ window.addEventListener('unhandledrejection', function(e) {
                 oninput="filtrarSelectEmpresa()" onfocus="filtrarSelectEmpresa()"
                 style="font-size:13px;margin-bottom:6px">
               <div id="aEmpresaSugerencias" style="display:none;position:absolute;top:100%;left:0;right:0;background:white;border:1.5px solid var(--az);border-radius:0 0 8px 8px;box-shadow:var(--shadow-lg);max-height:220px;overflow-y:auto;z-index:20"></div>
-              <select id="aEmpresa" onchange="autocompletarEmpresa();autoGuardarEstancia()" style="font-size:13px">
+              <select id="aEmpresa" onchange="autocompletarEmpresa();autoGuardarEstancia()" style="font-size:16px">
                 <option value="">— Seleccionar empresa registrada —</option>
               </select>
             </div>
@@ -1431,11 +1439,11 @@ window.addEventListener('unhandledrejection', function(e) {
           <div class="form-row col2" style="margin-bottom:0">
             <div class="form-group">
               <label>Nombre empresa</label>
-              <input type="text" id="aEmpresaNombre" placeholder="Empresa S.L." oninput="autoGuardarEstancia()" style="font-size:13px">
+              <input type="text" id="aEmpresaNombre" placeholder="Empresa S.L." oninput="autoGuardarEstancia()" style="font-size:16px">
             </div>
             <div class="form-group">
               <label>CIF</label>
-              <input type="text" id="aEmpresaCif" placeholder="B12345678" class="mono" oninput="autoGuardarEstancia()" style="font-size:13px">
+              <input type="text" id="aEmpresaCif" placeholder="B12345678" class="mono" oninput="autoGuardarEstancia()" style="font-size:16px">
             </div>
           </div>
         </div>
@@ -1700,7 +1708,7 @@ window.addEventListener('unhandledrejection', function(e) {
             </label>
             <div style="position:relative">
               <input type="text" id="eDireccion" placeholder="Escribe calle, número y ciudad…"
-                     oninput="buscarDireccionAuto()" autocomplete="off" style="height:44px;font-size:15px;padding:10px 14px;width:100%;box-sizing:border-box"
+                     oninput="buscarDireccionAuto()" autocomplete="off" style="height:44px;font-size:16px;padding:10px 14px;width:100%;box-sizing:border-box"
                      onblur="setTimeout(()=>{ const s=document.getElementById('eDireccionSugs'); if(s) s.style.display='none'; },200)">
               <div id="eDireccionSugs" style="display:none;position:absolute;top:100%;left:0;right:0;background:white;border:1.5px solid var(--az);border-radius:0 0 8px 8px;box-shadow:var(--shadow-lg);z-index:50;max-height:260px;overflow-y:auto"></div>
             </div>
@@ -2794,7 +2802,7 @@ function mostrarFormEstancia(estanciaId) {
   const fe = document.getElementById('formEstancia');
   if (fe) {
     fe.style.display = estanciaId ? 'block' : 'none';
-    if (estanciaId) fe.scrollIntoView({behavior:'smooth',block:'nearest'});
+    if (estanciaId) fe.scrollIntoView({behavior:'smooth',block:'center'});
   }
   _mostrarBtnGuardar('btnGuardarEstancia', !estanciaId);
   // Cargar seguimientos si es edicion
@@ -2957,7 +2965,7 @@ function renderHistorialProspeccionModal(empresaId, historial) {
         </div>
       </div>
       ${esPropia
-        ? `<textarea style="width:100%;box-sizing:border-box;min-height:50px;font-size:12px;background:white" placeholder="Sin nota" onblur="guardarNotaHistorial(${empresaId},${h.id},this)">${escHtml(h.nota||'')}</textarea>`
+        ? `<textarea style="width:100%;box-sizing:border-box;min-height:50px;font-size:16px;background:white" placeholder="Sin nota" onblur="guardarNotaHistorial(${empresaId},${h.id},this)">${escHtml(h.nota||'')}</textarea>`
         : (h.nota ? `<div style="font-size:12px;color:var(--gray2);white-space:pre-wrap">${escHtml(h.nota)}</div>` : '<div style="font-size:12px;color:var(--gray4);font-style:italic">Sin nota</div>')
       }
     </div>`;
@@ -3719,12 +3727,12 @@ async function exportarEmpresasExcel() {
   const rows=[['ID','Nombre','CIF','Sector','Direccion','Contacto','Cargo','Telefono','Email','Obs','Estado Prospeccion','Fecha Ultima Gestion','Gestionado Por','N Estancias'],
     ...filtradas.map(e=>[e.id,e.nombre,formatCif(e.cif),e.sector,e.direccion,e.contactoNombre,e.contactoCargo,e.contactoTel,e.contactoEmail,e.obs,
       (PROSPECCION_INFO[e.prospeccionEstado]||PROSPECCION_INFO.sin_contactar).label, e.prospeccionFecha||'', e.prospeccionContacto||'',
-      state.estancias.filter(s=>!s.deleted&&(s.empresaId===e.id||(!s.empresaId&&s.empresaCif===e.cif))).length])];
+      state.estancias.filter(s=>!s.deleted&&(s.empresaId===e.id||(!s.empresaId&&s.empresaCif&&s.empresaCif===e.cif))).length])];
 
   // Hoja 2: relación alumno–empresa (una fila por estancia) de las empresas exportadas
-  const relacion = state.estancias.filter(s => !s.deleted && (idsFiltradas.has(s.empresaId) || filtradas.some(e=>!s.empresaId && s.empresaCif===e.cif)))
+  const relacion = state.estancias.filter(s => !s.deleted && (idsFiltradas.has(s.empresaId) || filtradas.some(e=>!s.empresaId && s.empresaCif && s.empresaCif===e.cif)))
     .map(s => {
-      const emp = filtradas.find(e => e.id === s.empresaId || (!s.empresaId && s.empresaCif === e.cif));
+      const emp = filtradas.find(e => e.id === s.empresaId || (!s.empresaId && s.empresaCif && s.empresaCif === e.cif));
       const al  = state.alumnado.find(a => a.id === s.alumnoId);
       return [emp?.nombre||s.empresaNombre||'', formatCif(emp?.cif)||s.empresaCif||'', al?.apellidos||'', al?.nombre||'', al?.dni||'',
         s.curso, s.nivel||'', s.periodoIni||'', s.periodoFin||'', s.contacto||'', s.obsEmpresa||'', s.obsAlumno||''];
@@ -4920,7 +4928,7 @@ function renderMapaMarkers() {
     listaEl.innerHTML = empresasFiltradas.map(emp => {
       const tieneDir = emp.direccion && emp.direccion.trim();
       const tieneCoords = emp.lat && emp.lon;
-      const nAct = state.estancias.filter(e => !e.deleted && (e.empresaId === emp.id || (!e.empresaId && e.empresaCif === emp.cif)) && e.curso === cursoRef).length;
+      const nAct = state.estancias.filter(e => !e.deleted && (e.empresaId === emp.id || (!e.empresaId && e.empresaCif && e.empresaCif === emp.cif)) && e.curso === cursoRef).length;
       let estadoIcon, estadoTxt, estadoColor;
       if (tieneCoords) {
         estadoIcon = '📍'; estadoTxt = 'En el mapa'; estadoColor = 'var(--green)';
@@ -4952,7 +4960,7 @@ function renderMapaMarkers() {
     if (q && !`${emp.nombre} ${emp.cif} ${emp.sector} ${emp.contactoNombre}`.toLowerCase().includes(q)) return;
 
     // estancias → join with alumnado for display
-    const matchEmp = e => !e.deleted && (e.empresaId===emp.id || (!e.empresaId && e.empresaCif===emp.cif));
+    const matchEmp = e => !e.deleted && (e.empresaId===emp.id || (!e.empresaId && e.empresaCif && e.empresaCif===emp.cif));
     const estAct  = state.estancias.filter(e => matchEmp(e) && e.curso===cursoRef);
     const estHist = state.estancias.filter(e => matchEmp(e) && e.curso!==cursoRef);
     const alumnosActuales  = estAct.map(e=>{const a=state.alumnado.find(x=>x.id===e.alumnoId)||{}; return {...e,apellidos:a.apellidos||'?',nombre:a.nombre||''};});
@@ -5082,14 +5090,14 @@ function enfocarEmpresaMapa(empresaId) {
       <div style="margin-bottom:14px">
         <label style="font-size:13px;font-weight:600;color:var(--az);display:block;margin-bottom:5px">Usuario</label>
         <input id="loginUser" type="text" autocomplete="username" placeholder="admin"
-          style="width:100%;padding:10px 12px;border:1.5px solid var(--gray5);border-radius:6px;font-family:var(--font);font-size:14px;outline:none"
+          style="width:100%;padding:10px 12px;border:1.5px solid var(--gray5);border-radius:6px;font-family:var(--font);font-size:16px;outline:none"
           onfocus="this.style.borderColor='var(--az)'" onblur="this.style.borderColor='var(--gray5)'"
           onkeydown="if(event.key==='Enter')doLogin()">
       </div>
       <div style="margin-bottom:22px">
         <label style="font-size:13px;font-weight:600;color:var(--az);display:block;margin-bottom:5px">Contraseña</label>
         <input id="loginPass" type="password" autocomplete="current-password" placeholder="••••••••"
-          style="width:100%;padding:10px 12px;border:1.5px solid var(--gray5);border-radius:6px;font-family:var(--font);font-size:14px;outline:none"
+          style="width:100%;padding:10px 12px;border:1.5px solid var(--gray5);border-radius:6px;font-family:var(--font);font-size:16px;outline:none"
           onfocus="this.style.borderColor='var(--az)'" onblur="this.style.borderColor='var(--gray5)'"
           onkeydown="if(event.key==='Enter')doLogin()">
       </div>
