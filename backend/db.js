@@ -116,6 +116,7 @@ const migs = [
   `ALTER TABLE empresas ADD COLUMN prospeccion_fecha TEXT`,
   `ALTER TABLE empresas ADD COLUMN prospeccion_contacto TEXT`,
   `ALTER TABLE empresas ADD COLUMN prospeccion_notas TEXT`,
+  `ALTER TABLE alumnado ADD COLUMN nivel TEXT`,
 ];
 for (const sql of migs) {
   try { db.exec(sql); }

@@ -43,6 +43,9 @@ services:
       - "5000:80"
     depends_on:
       - backend
+    networks:
+      - default
+      - web
 
 x-casaos:
   main: frontend
@@ -63,3 +66,8 @@ x-casaos:
   port_map: "5000"
   scheme: http
   index: /
+
+networks:
+  default: {}
+  web:
+    external: true

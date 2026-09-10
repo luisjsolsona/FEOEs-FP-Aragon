@@ -8,7 +8,7 @@ const router = express.Router();
 router.get('/', requireAuth, (req, res) => {
   const rows = db.prepare(`
     SELECT
-      a.id, a.apellidos, a.nombre, a.dni, a.familia, a.obs,
+      a.id, a.apellidos, a.nombre, a.dni, a.familia, a.obs, a.nivel,
       a.fecha_nacimiento, a.telefono1, a.telefono2, a.deleted, a.created_at, a.updated_at,
       json_group_array(
         CASE WHEN e.id IS NULL THEN NULL ELSE json_object(
@@ -53,19 +53,19 @@ router.get('/', requireAuth, (req, res) => {
 
 // POST /api/alumnado — upsert por DNI
 router.post('/', requireProfe, (req, res) => {
-  const { apellidos, nombre, dni, familia, obs, fecha_nacimiento, telefono1, telefono2 } = req.body;
+  const { apellidos, nombre, dni, familia, obs, fecha_nacimiento, telefono1, telefono2, nivel } = req.body;
   if (!apellidos || !nombre || !dni) return res.status(400).json({ error: 'Apellidos, nombre y DNI son obligatorios.' });
   const dniUp = dni.toUpperCase().trim();
   const exist = db.prepare('SELECT * FROM alumnado WHERE dni = ?').get(dniUp);
   if (exist) {
-    db.prepare(`UPDATE alumnado SET apellidos=?,nombre=?,familia=?,obs=?,fecha_nacimiento=?,telefono1=?,telefono2=?,deleted=0,updated_at=datetime('now') WHERE id=?`)
+    db.prepare(`UPDATE alumnado SET apellidos=?,nombre=?,familia=?,obs=?,fecha_nacimiento=?,telefono1=?,telefono2=?,nivel=?,deleted=0,updated_at=datetime('now') WHERE id=?`)
       .run(apellidos, nombre, familia||null, obs??exist.obs, fecha_nacimiento??exist.fecha_nacimiento,
-           telefono1??exist.telefono1, telefono2??exist.telefono2, exist.id);
-    return res.json({ alumno: { ...exist, apellidos, nombre, familia, obs: obs??exist.obs }, updated: true });
+           telefono1??exist.telefono1, telefono2??exist.telefono2, nivel??exist.nivel, exist.id);
+    return res.json({ alumno: { ...exist, apellidos, nombre, familia, obs: obs??exist.obs, nivel: nivel??exist.nivel }, updated: true });
   }
-  const r = db.prepare(`INSERT INTO alumnado (apellidos,nombre,dni,familia,obs,fecha_nacimiento,telefono1,telefono2) VALUES (?,?,?,?,?,?,?,?)`)
-    .run(apellidos, nombre, dniUp, familia||null, obs||null, fecha_nacimiento||null, telefono1||null, telefono2||null);
-  res.status(201).json({ alumno: { id: r.lastInsertRowid, apellidos, nombre, dni: dniUp, familia, obs, fecha_nacimiento, telefono1, telefono2 } });
+  const r = db.prepare(`INSERT INTO alumnado (apellidos,nombre,dni,familia,obs,fecha_nacimiento,telefono1,telefono2,nivel) VALUES (?,?,?,?,?,?,?,?,?)`)
+    .run(apellidos, nombre, dniUp, familia||null, obs||null, fecha_nacimiento||null, telefono1||null, telefono2||null, nivel||null);
+  res.status(201).json({ alumno: { id: r.lastInsertRowid, apellidos, nombre, dni: dniUp, familia, obs, fecha_nacimiento, telefono1, telefono2, nivel } });
 });
 
 // PUT /api/alumnado/:id
@@ -73,10 +73,10 @@ router.put('/:id', requireProfe, (req, res) => {
   const id = parseInt(req.params.id);
   const a = db.prepare('SELECT * FROM alumnado WHERE id = ?').get(id);
   if (!a) return res.status(404).json({ error: 'Alumno no encontrado.' });
-  const { apellidos, nombre, familia, obs, fecha_nacimiento, telefono1, telefono2 } = req.body;
-  db.prepare(`UPDATE alumnado SET apellidos=?,nombre=?,familia=?,obs=?,fecha_nacimiento=?,telefono1=?,telefono2=?,updated_at=datetime('now') WHERE id=?`)
+  const { apellidos, nombre, familia, obs, fecha_nacimiento, telefono1, telefono2, nivel } = req.body;
+  db.prepare(`UPDATE alumnado SET apellidos=?,nombre=?,familia=?,obs=?,fecha_nacimiento=?,telefono1=?,telefono2=?,nivel=?,updated_at=datetime('now') WHERE id=?`)
     .run(apellidos??a.apellidos, nombre??a.nombre, familia??a.familia, obs??a.obs,
-         fecha_nacimiento??a.fecha_nacimiento, telefono1??a.telefono1, telefono2??a.telefono2, id);
+         fecha_nacimiento??a.fecha_nacimiento, telefono1??a.telefono1, telefono2??a.telefono2, nivel??a.nivel, id);
   res.json({ ok: true });
 });
 

@@ -726,13 +726,11 @@ window.addEventListener('unhandledrejection', function(e) {
     /* Menú datos: ajuste de posición */
     #menuDatos { right: 0; left: auto; min-width: 200px; }
 
-    /* Mapa de empresas: apilar listado y mapa en vez de lado a lado
-       (con flex-direction:row y un ancho fijo de 340px, el sidebar
-       dejaba el mapa casi sin sitio en pantallas de <640px) */
-    #mapaLayout { flex-direction: column; }
-    #mapaSidebar { width: 100% !important; height: 180px !important; min-height: 180px !important; }
-    #mapaMapWrap { width: 100%; }
-    #mapaContainer { height: 55vh !important; min-height: 260px !important; }
+    /* Mapa de empresas en móvil: se oculta el listado lateral y el mapa pasa
+       a ocupar todo el ancho — mucho más cómodo para moverse con 2 dedos
+       sin que el listado le quite sitio ni interfiera con el scroll */
+    #mapaSidebar { display: none !important; }
+    #mapaContainer { height: 65vh !important; min-height: 320px !important; }
   }
 
   @media (min-width: 641px) and (max-width: 900px) {
@@ -947,8 +945,10 @@ window.addEventListener('unhandledrejection', function(e) {
       <select class="filter-select" id="filterEmpresa" onchange="renderTabla()">
         <option value="">Todas las empresas</option>
       </select>
-      <select class="filter-select" id="filterAnio" onchange="renderTabla()">
-        <option value="">Todos los años</option>
+      <select class="filter-select" id="filterVisitas" onchange="renderTabla()">
+        <option value="">Visitas: todas</option>
+        <option value="con">Con visitas</option>
+        <option value="sin">Sin visitas</option>
       </select>
       <button class="btn btn-secondary" onclick="abrirImport('alumnado')">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
@@ -971,7 +971,7 @@ window.addEventListener('unhandledrejection', function(e) {
             <th onclick="sortBy('curso')" style="min-width:110px">Curso / Nivel<span class="sort-arrow">↕</span></th>
             <th onclick="sortBy('empresa')">Empresa</th>
             <th class="hide-mobile">Periodo</th>
-            <th class="hide-mobile" title="Observaciones del alumno en la última estancia">Obs.</th>
+            <th class="hide-mobile" title="Visitas de seguimiento realizadas (todas las estancias)">Nº Visitas</th>
             <th style="min-width:200px">Acciones</th>
           </tr>
         </thead>
@@ -1328,6 +1328,21 @@ window.addEventListener('unhandledrejection', function(e) {
           <div class="form-group">
             <label>Teléfono de contacto 2</label>
             <input type="text" id="aTelefono2" placeholder="600 000 000" class="mono" oninput="autoGuardarAlumno()">
+          </div>
+        </div>
+        <div class="form-row col2">
+          <div class="form-group">
+            <label>Nivel / Ciclo</label>
+            <select id="aNivelAlumno" onchange="autoGuardarAlumno()">
+              <option value="">— Sin especificar —</option>
+              <option value="1CFGB">1º CFGB</option>
+              <option value="2CFGB">2º CFGB</option>
+              <option value="1CFGM">1º CFGM</option>
+              <option value="2CFGM">2º CFGM</option>
+              <option value="1CFGS">1º CFGS</option>
+              <option value="2CFGS">2º CFGS</option>
+              <option value="CE">C. Especialización</option>
+            </select>
           </div>
         </div>
         <div class="form-row" style="margin-top:10px">
@@ -2071,6 +2086,7 @@ function autoGuardarAlumno() {
       fecha_nacimiento: document.getElementById('aFechaNacimiento').value,
       telefono1: document.getElementById('aTelefono1').value.trim(),
       telefono2: document.getElementById('aTelefono2').value.trim(),
+      nivel:     document.getElementById('aNivelAlumno').value,
     };
     if (!body.apellidos || !body.nombre || !body.dni) return;
     await Alumnado.update(id, body);
@@ -2324,25 +2340,26 @@ function renderStats() {
 //  TABLA ALUMNADO
 // ══════════════════════════════════════════
 function renderTabla() {
-  const q        = (document.getElementById('searchInput')?.value  || '').toLowerCase();
-  const fCurso   = document.getElementById('filterCurso')?.value   || '';
-  const fNivel   = document.getElementById('filterNivel')?.value   || '';
-  const fEmpresa = document.getElementById('filterEmpresa')?.value || '';
-  const fAnio    = document.getElementById('filterAnio')?.value    || '';
+  const q         = (document.getElementById('searchInput')?.value  || '').toLowerCase();
+  const fCurso    = document.getElementById('filterCurso')?.value   || '';
+  const fNivel    = document.getElementById('filterNivel')?.value   || '';
+  const fEmpresa  = document.getElementById('filterEmpresa')?.value || '';
+  const fVisitas  = document.getElementById('filterVisitas')?.value || '';
 
   let filas = state.alumnado.filter(a => !a.deleted).map(a => {
     const ests = state.estancias.filter(e => !e.deleted && e.alumnoId === a.id)
                    .sort((x,y) => (y.curso||'').localeCompare(x.curso||''));
-    return { ...a, estancias: ests, ultima: ests[0] || null };
+    const nVisitasTotal = ests.reduce((acc,e)=>acc+(e.numSeguimientos||0),0);
+    return { ...a, estancias: ests, ultima: ests[0] || null, nVisitasTotal };
   });
 
   filas = filas.filter(f => {
     const txt = `${f.apellidos} ${f.nombre} ${f.dni} ${f.estancias.map(e=>`${e.curso} ${e.nivel||''} ${e.empresaNombre||''} ${e.empresaCif||''} ${e.obsAlumno||''}`).join(' ')}`.toLowerCase();
-    return (!q       || txt.includes(q))
-      && (!fCurso    || f.estancias.some(e=>e.curso===fCurso))
-      && (!fNivel    || f.estancias.some(e=>(e.nivel||'')===fNivel))
-      && (!fEmpresa  || f.estancias.some(e=>e.empresaNombre===fEmpresa))
-      && (!fAnio     || f.estancias.some(e=>(e.periodoIni||'').startsWith(fAnio)));
+    return (!q        || txt.includes(q))
+      && (!fCurso     || f.estancias.some(e=>e.curso===fCurso))
+      && (!fNivel     || (f.nivel||'')===fNivel)
+      && (!fEmpresa   || f.estancias.some(e=>e.empresaNombre===fEmpresa))
+      && (!fVisitas   || (fVisitas==='con' ? f.nVisitasTotal>0 : f.nVisitasTotal===0));
   });
 
   filas.sort((a,b) => {
@@ -2390,8 +2407,13 @@ function renderTabla() {
       <td class="hide-mobile" style="font-size:12px;color:var(--gray3);min-width:100px">
         ${u&&u.periodoIni?`${formatFecha(u.periodoIni)} \u2192<br>${formatFecha(u.periodoFin)}`:'—'}
       </td>
-      <td class="hide-mobile" style="font-size:12px;color:var(--gray3);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(u?.obsAlumno||'')}">
-        ${u?.obsAlumno?'📝 '+escHtml(u.obsAlumno):'—'}
+      <td class="hide-mobile" style="font-size:12px;min-width:100px">
+        ${(() => { const nV=f.nVisitasTotal||0;
+          const vColor = nV===0 ? 'var(--red)' : nV<2 ? '#8B6000' : 'var(--green)';
+          const vBg    = nV===0 ? 'var(--red-light)' : nV<2 ? '#FFF4E0' : 'var(--green-light)';
+          const vIcon  = nV===0 ? '⚠' : nV<2 ? '⏳' : '✓';
+          return `<span style="display:inline-flex;align-items:center;gap:4px;background:${vBg};color:${vColor};border-radius:4px;padding:2px 8px;font-size:12px;font-weight:700">${vIcon} ${nV} visita${nV!==1?'s':''}</span>`;
+        })()}
       </td>
       <td style="min-width:200px" onclick="event.stopPropagation()">
         <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
@@ -2539,14 +2561,12 @@ function actualizarFiltros() {
   const estActivas = state.estancias.filter(e=>!e.deleted);
   const cursos   = [...new Set(estActivas.map(e=>e.curso))].sort().reverse();
   const empresas = [...new Set(estActivas.map(e=>e.empresaNombre).filter(Boolean))].sort();
-  const anios    = [...new Set(estActivas.filter(e=>e.periodoIni).map(e=>e.periodoIni.substring(0,4)))].sort().reverse();
   const selC=document.getElementById('filterCurso'),
-        selE=document.getElementById('filterEmpresa'), selA=document.getElementById('filterAnio');
+        selE=document.getElementById('filterEmpresa');
   if (!selC) return;
-  const cv=selC.value,ev=selE.value,av=selA.value;
+  const cv=selC.value,ev=selE.value;
   selC.innerHTML = '<option value="">Todos los cursos</option>'   + cursos.map(c=>`<option ${c===cv?'selected':''}>${c}</option>`).join('');
   selE.innerHTML = '<option value="">Todas las empresas</option>' + empresas.map(e=>`<option ${e===ev?'selected':''}>${e}</option>`).join('');
-  selA.innerHTML = '<option value="">Todos los años</option>'     + anios.map(a=>`<option ${a===av?'selected':''}>${a}</option>`).join('');
 }
 
 function actualizarContadores() {
@@ -2599,6 +2619,7 @@ function abrirPanelAlumno(id, modo) {
     document.getElementById('alumnoId').value = '';
     ['aApellidos','aNombre','aDni','aFechaNacimiento','aTelefono1','aTelefono2'].forEach(f=>document.getElementById(f).value='');
     document.getElementById('aObsPersonal').value = '';
+    document.getElementById('aNivelAlumno').value = '';
     actualizarEdadAlumno();
     mostrarFormEstancia(null);
     _mostrarBtnGuardar('btnGuardarAlumno', true);
@@ -2611,6 +2632,7 @@ function abrirPanelAlumno(id, modo) {
     document.getElementById('aFechaNacimiento').value = a.fechaNacimiento || '';
     document.getElementById('aTelefono1').value = a.telefono1 || '';
     document.getElementById('aTelefono2').value = a.telefono2 || '';
+    document.getElementById('aNivelAlumno').value = a.nivel || '';
     actualizarEdadAlumno();
     renderListaEstancias(a.id);
     mostrarFormEstancia(null);
@@ -3007,7 +3029,7 @@ function abrirModalEstanciasEmpresa(empresaId) {
             <td style="font-weight:500">${escHtml(a.apellidos)}, ${escHtml(a.nombre)}</td>
             <td class="mono" style="color:var(--gray3)">${escHtml(a.dni)}</td>
             <td style="color:var(--gray3)">${a.periodoIni ? formatFecha(a.periodoIni)+' → '+formatFecha(a.periodoFin) : '—'}</td>
-            <td><span style="display:inline-flex;align-items:center;gap:4px;background:${vBg};color:${vColor};border-radius:4px;padding:2px 8px;font-size:12px;font-weight:700">${vIcon} ${a.nVisitas} visita${a.nVisitas!==1?'s':''}${a.nPend>0?' · <span style="font-weight:400;font-size:11px">'+a.nPend+' pend.</span>':''}</span></td>
+            <td><span style="cursor:pointer;display:inline-flex;align-items:center;gap:4px;background:${vBg};color:${vColor};border-radius:4px;padding:2px 8px;font-size:12px;font-weight:700" title="Ver detalle de la visita" onclick="verDetalleVisitaEstancia(${a.alumnoId},${a.id})">${vIcon} ${a.nVisitas} visita${a.nVisitas!==1?'s':''}${a.nPend>0?' · <span style="font-weight:400;font-size:11px">'+a.nPend+' pend.</span>':''}</span></td>
             <td><button class="btn btn-sm btn-secondary" onclick="cerrarModalEstanciasEmpresa();abrirPanelAlumno(${a.alumnoId})">✏️ Editar</button></td>
           </tr>`;
         }).join('')}
@@ -3019,6 +3041,20 @@ function abrirModalEstanciasEmpresa(empresaId) {
 
 function cerrarModalEstanciasEmpresa() {
   document.getElementById('overlayEstanciasEmpresa')?.classList.remove('open');
+}
+
+// Desde el badge de visitas de la modal "Alumnado en estancia" de una empresa:
+// cierra esa modal, abre la ficha del alumno en su pestaña de Estancias FEOE,
+// despliega la estancia concreta y, si solo tiene una visita registrada, la
+// abre directamente para edición (si tiene varias, deja la lista visible).
+async function verDetalleVisitaEstancia(alumnoId, estanciaId) {
+  cerrarModalEstanciasEmpresa();
+  abrirPanelAlumno(alumnoId, 'estancias');
+  mostrarFormEstancia(estanciaId);
+  try {
+    const { seguimientos } = await Seguimientos.list({ estancia_id: estanciaId });
+    if (seguimientos.length === 1) abrirFormSeguimiento(seguimientos[0].id);
+  } catch (err) { /* la lista de seguimientos ya se habrá cargado igualmente desde mostrarFormEstancia */ }
 }
 
 function renderEmpresas() {
@@ -3081,10 +3117,10 @@ function renderEmpresas() {
           <input type="checkbox" class="cb-empresa" data-id="${e.id}" ${seleccionEmpresas.has(e.id)?'checked':''} onchange="toggleSeleccionEmpresa(${e.id},this.checked)" style="margin-top:5px;width:16px;height:16px;flex-shrink:0;cursor:pointer">
           <div>
           <div class="empresa-name">🏢 ${escHtml(e.nombre)}</div>
-          <div class="empresa-meta mono">${escHtml(formatCif(e.cif))}${e.sector ? ` · ${escHtml(e.sector)}` : ''}${e.direccion ? ` · ${escHtml(e.direccion)}` : '<span style="color:var(--red)"> · Sin dirección</span>'}</div>
+          <div class="empresa-meta mono">${e.contactoTel ? escHtml(e.contactoTel) : '<span style="color:var(--gray4)">Sin teléfono</span>'}${e.sector ? ` · ${escHtml(e.sector)}` : ''}${e.direccion ? ` · ${escHtml(e.direccion)}` : '<span style="color:var(--red)"> · Sin dirección</span>'}</div>
           <div class="empresa-meta" style="margin-top:3px">
             ${e.contactoNombre ? `👤 ${escHtml(e.contactoNombre)}${e.contactoCargo?' ('+escHtml(e.contactoCargo)+')':''}` : ''}
-            ${e.contactoTel ? `<a href="tel:${esc(e.contactoTel)}" style="margin-left:8px;font-weight:700;color:var(--az);font-size:14px">📞 ${escHtml(e.contactoTel)}</a>` : ''}
+            <span style="margin-left:8px;font-weight:400;color:var(--gray4);font-size:11px" title="CIF/NIF">🆔 ${escHtml(formatCif(e.cif))}</span>
           </div>
           </div>
         </div>
@@ -3633,25 +3669,23 @@ async function restaurarBackupJSON(evt) {
 }
 
 // Una fila por estancia (relación alumno↔empresa), aplicando los mismos filtros
-// que la tabla de Alumnado (búsqueda, curso, nivel, empresa, año), para que lo
+// que la tabla de Alumnado (búsqueda, curso, nivel, empresa), para que lo
 // exportado coincida con lo que se está viendo en pantalla en ese momento.
 function getEstanciasFiltradas() {
   const q        = (document.getElementById('searchInput')?.value  || '').toLowerCase();
   const fCurso   = document.getElementById('filterCurso')?.value   || '';
   const fNivel   = document.getElementById('filterNivel')?.value   || '';
   const fEmpresa = document.getElementById('filterEmpresa')?.value || '';
-  const fAnio    = document.getElementById('filterAnio')?.value    || '';
 
   return state.estancias.filter(e => !e.deleted).map(e => {
     const a = state.alumnado.find(x => x.id === e.alumnoId) || {};
-    return { ...e, alumnoId: e.alumnoId, apellidos: a.apellidos||'', nombre: a.nombre||'', dni: a.dni||'', familia: a.familia||'' };
+    return { ...e, alumnoId: e.alumnoId, apellidos: a.apellidos||'', nombre: a.nombre||'', dni: a.dni||'', familia: a.familia||'', alumnoNivel: a.nivel||'' };
   }).filter(r => {
     const txt = `${r.apellidos} ${r.nombre} ${r.dni} ${r.curso} ${r.nivel||''} ${r.empresaNombre||''} ${r.empresaCif||''} ${r.obsAlumno||''}`.toLowerCase();
     return (!q       || txt.includes(q))
       && (!fCurso    || r.curso === fCurso)
-      && (!fNivel    || (r.nivel||'') === fNivel)
-      && (!fEmpresa  || r.empresaNombre === fEmpresa)
-      && (!fAnio     || (r.periodoIni||'').startsWith(fAnio));
+      && (!fNivel    || r.alumnoNivel === fNivel)
+      && (!fEmpresa  || r.empresaNombre === fEmpresa);
   });
 }
 
@@ -3828,7 +3862,8 @@ async function guardarAlumno() {
     obs:document.getElementById('aObsPersonal').value.trim(),
     fecha_nacimiento:document.getElementById('aFechaNacimiento').value,
     telefono1:document.getElementById('aTelefono1').value.trim(),
-    telefono2:document.getElementById('aTelefono2').value.trim()};
+    telefono2:document.getElementById('aTelefono2').value.trim(),
+    nivel:document.getElementById('aNivelAlumno').value};
   const idEl=document.getElementById('alumnoId').value;
   try {
     setSaveIndicator('pending');
@@ -4020,7 +4055,7 @@ async function cargarDatos() {
       : [{pendientes:[]}, {historial:[]}];
     const {pendientes} = pendientesRes;
     const {historial} = historialRes;
-    state.alumnado=alumnado.map(a=>({id:a.id,apellidos:a.apellidos,nombre:a.nombre,dni:a.dni,familia:a.familia||'',obs:a.obs||'',fechaNacimiento:a.fecha_nacimiento||'',telefono1:a.telefono1||'',telefono2:a.telefono2||'',deleted:!!a.deleted,estancias:(a.estancias||[]).map(normalizarEstancia)}));
+    state.alumnado=alumnado.map(a=>({id:a.id,apellidos:a.apellidos,nombre:a.nombre,dni:a.dni,familia:a.familia||'',obs:a.obs||'',nivel:a.nivel||'',fechaNacimiento:a.fecha_nacimiento||'',telefono1:a.telefono1||'',telefono2:a.telefono2||'',deleted:!!a.deleted,estancias:(a.estancias||[]).map(normalizarEstancia)}));
     state.empresas=empresas.map(e=>({id:e.id,nombre:e.nombre,cif:e.cif,sector:e.sector||'',direccion:e.direccion||'',lat:e.lat||null,lon:e.lon||null,contactoNombre:e.contacto_nombre||'',contactoCargo:e.contacto_cargo||'',contactoTel:e.contacto_tel||'',contactoEmail:e.contacto_email||'',obs:e.obs||'',prospeccionEstado:e.prospeccion_estado||'sin_contactar',prospeccionFecha:e.prospeccion_fecha||'',prospeccionContacto:e.prospeccion_contacto||'',prospeccionNotas:e.prospeccion_notas||'',deleted:!!e.deleted}));
     state.pendientes=pendientes.map(p=>({id:p.id,tipo:p.tipo,refId:p.ref_id,nombre:p.nombre,solicitante:p.solicitante,fecha:p.created_at,resuelto:!!p.resuelto,aprobado:p.aprobado}));
     state.historial=historial.map(h=>({id:h.id,tipo:h.tipo,texto:h.texto,usuario:h.usuario,fecha:h.created_at}));
