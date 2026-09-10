@@ -725,10 +725,18 @@ window.addEventListener('unhandledrejection', function(e) {
 
     /* Menú datos: ajuste de posición */
     #menuDatos { right: 0; left: auto; min-width: 200px; }
+
+    /* Mapa de empresas: apilar listado y mapa en vez de lado a lado
+       (con flex-direction:row y un ancho fijo de 340px, el sidebar
+       dejaba el mapa casi sin sitio en pantallas de <640px) */
+    #mapaLayout { flex-direction: column; }
+    #mapaSidebar { width: 100% !important; height: 180px !important; min-height: 180px !important; }
+    #mapaMapWrap { width: 100%; }
+    #mapaContainer { height: 55vh !important; min-height: 260px !important; }
   }
 
   @media (min-width: 641px) and (max-width: 900px) {
-    header h1 font-size: 14px;
+    header h1 { font-size: 14px; }
     .form-row.col3 { grid-template-columns: 1fr 1fr; }
     .hide-mobile { display: none !important; }
     th, td { font-size: 12px; }
@@ -1064,7 +1072,7 @@ window.addEventListener('unhandledrejection', function(e) {
       </div>
     </div>
     <!-- Listado (izquierda) + Mapa (derecha) -->
-    <div style="display:flex;gap:12px;align-items:flex-start">
+    <div id="mapaLayout" style="display:flex;gap:12px;align-items:flex-start">
       <div id="mapaSidebar" style="width:340px;flex-shrink:0;background:white;border:var(--border);border-radius:var(--radius);box-shadow:var(--shadow);height:calc(100vh - 220px);min-height:400px;overflow-y:auto">
         <div style="padding:10px 12px;border-bottom:var(--border);font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--gray3);position:sticky;top:0;background:white">
           Empresas (<span id="mapaSidebarCount">0</span>)
@@ -1072,7 +1080,7 @@ window.addEventListener('unhandledrejection', function(e) {
         <div id="mapaListaEmpresas"></div>
         <div style="padding:10px 12px;font-size:11px;color:var(--gray4);border-top:var(--border)">💡 Para que una empresa aparezca en el mapa, rellena el campo <b>Dirección</b> en su ficha.</div>
       </div>
-      <div style="position:relative;flex:1;min-width:0;border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-lg);border:var(--border);isolation:isolate;z-index:0">
+      <div id="mapaMapWrap" style="position:relative;flex:1;min-width:0;border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-lg);border:var(--border);isolation:isolate;z-index:0">
         <div id="mapaContainer" style="height:calc(100vh - 220px);min-height:400px;background:var(--gray6)"></div>
         <div id="mapaLoader" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(255,255,255,0.9);z-index:500;gap:10px">
           <div style="width:36px;height:36px;border:3px solid var(--az-light);border-top-color:var(--az);border-radius:50%;animation:spin 0.8s linear infinite"></div>
