@@ -1,6 +1,6 @@
 const express = require('express');
 const db      = require('../db');
-const { requireAuth, requireProfe, requireTutor } = require('../middleware/auth');
+const { requireAuth, requireProfe, requireAdmin } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -80,16 +80,16 @@ router.put('/:id', requireProfe, (req, res) => {
   res.json({ ok: true });
 });
 
-// DELETE /api/alumnado/:id — tutor o superior
-router.delete('/:id', requireTutor, (req, res) => {
+// DELETE /api/alumnado/:id — solo admin (tutor/profe deben solicitarlo vía /api/pendientes)
+router.delete('/:id', requireAdmin, (req, res) => {
   const id = parseInt(req.params.id);
   db.prepare(`UPDATE alumnado SET deleted=1,updated_at=datetime('now') WHERE id=?`).run(id);
   db.prepare(`UPDATE estancias SET deleted=1,updated_at=datetime('now') WHERE alumno_id=?`).run(id);
   res.json({ ok: true });
 });
 
-// POST /api/alumnado/bulk-delete — solo tutor+
-router.post('/bulk-delete', requireTutor, (req, res) => {
+// POST /api/alumnado/bulk-delete — solo admin (tutor/profe deben solicitarlo vía /api/pendientes)
+router.post('/bulk-delete', requireAdmin, (req, res) => {
   const { ids } = req.body;
   if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'ids debe ser un array no vacio.' });
   const del = db.transaction(ids => {

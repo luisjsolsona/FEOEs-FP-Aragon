@@ -1,13 +1,13 @@
 const express = require('express');
 const bcrypt  = require('bcryptjs');
 const db      = require('../db');
-const { requireAuth, requireAdmin, requireTutor } = require('../middleware/auth');
+const { requireAuth, requireAdmin, requireProfe } = require('../middleware/auth');
 
 const router = express.Router();
 
 const VALID_ROLES = ['admin', 'tutor', 'profe', 'invitado'];
 
-router.get('/', requireTutor, (req, res) => {
+router.get('/', requireProfe, (req, res) => {
   const users = db.prepare(`SELECT id, username, nombre, role, activo, created_at FROM users ORDER BY role DESC, username ASC`).all();
   res.json({ users });
 });

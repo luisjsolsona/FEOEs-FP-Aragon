@@ -60,7 +60,7 @@ router.post('/', requireProfe, (req, res) => {
 
   // Docente que realiza la visita: admin/tutor pueden atribuirla a cualquier
   // docente activo; profe siempre queda fijado a sí mismo (no puede suplantar).
-  const esGestor = req.user.role === 'admin' || req.user.role === 'tutor';
+  const esGestor = req.user.role === 'admin' || req.user.role === 'tutor' || req.user.role === 'profe';
   const autorIdFinal     = (esGestor && autor_id) ? autor_id : req.user.id;
   const autorNombreFinal = (esGestor && autor_id && autor_nombre) ? autor_nombre : (req.user.nombre || req.user.role);
 
@@ -86,7 +86,7 @@ router.put('/:id', requireProfe, (req, res) => {
   const { fecha_visita, modalidad, anotaciones, num_visita, autor_id, autor_nombre } = req.body;
   const pendiente = (req.user.role === 'profe') ? 1 : (req.body.pendiente !== undefined ? (req.body.pendiente ? 1 : 0) : s.pendiente);
 
-  const esGestor = req.user.role === 'admin' || req.user.role === 'tutor';
+  const esGestor = req.user.role === 'admin' || req.user.role === 'tutor' || req.user.role === 'profe';
   const autorIdFinal     = (esGestor && autor_id) ? autor_id : s.autor_id;
   const autorNombreFinal = (esGestor && autor_id && autor_nombre) ? autor_nombre : s.autor_nombre;
 

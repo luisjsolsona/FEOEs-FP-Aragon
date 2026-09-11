@@ -1,6 +1,6 @@
 const express = require('express');
 const db      = require('../db');
-const { requireAuth, requireTutor, requireAdmin } = require('../middleware/auth');
+const { requireAuth, requireProfe, requireAdmin } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -12,7 +12,7 @@ router.get('/', requireAuth, (req, res) => {
 });
 
 // POST /api/historial — solo tutor o superior puede registrar entradas manuales
-router.post('/', requireTutor, (req, res) => {
+router.post('/', requireProfe, (req, res) => {
   const { tipo, texto } = req.body;
   if (!tipo || !texto) return res.status(400).json({ error: 'tipo y texto son obligatorios.' });
   const r = db.prepare(`INSERT INTO historial (tipo, texto, usuario) VALUES (?,?,?)`)

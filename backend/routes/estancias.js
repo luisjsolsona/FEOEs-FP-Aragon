@@ -1,6 +1,6 @@
 const express = require('express');
 const db      = require('../db');
-const { requireAuth, requireProfe, requireTutor } = require('../middleware/auth');
+const { requireAuth, requireProfe, requireAdmin } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -65,7 +65,7 @@ router.put('/:id', requireProfe, (req, res) => {
 });
 
 // DELETE /api/estancias/:id
-router.delete('/:id', requireTutor, (req, res) => {
+router.delete('/:id', requireAdmin, (req, res) => {
   db.prepare(`UPDATE estancias SET deleted=1,delete_pending=0,updated_at=datetime('now') WHERE id=?`).run(parseInt(req.params.id));
   res.json({ ok: true });
 });

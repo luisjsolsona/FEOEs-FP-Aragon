@@ -461,9 +461,9 @@ window.addEventListener('unhandledrejection', function(e) {
     display: flex; flex-wrap: nowrap; justify-content: space-between; align-items: flex-start; gap: 14px;
   }
   .empresa-card-header > div:first-child { flex: 1 1 auto; min-width: 0; }
-  .empresa-card-header > div:last-child { flex: 0 0 auto; }
+  .empresa-card-header > div:last-child { flex: 0 0 auto; justify-content: flex-end; }
   .empresa-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .empresa-name { font-family: 'Crimson Pro', serif; font-size: 17px; font-weight: 600; color: var(--az); }
+  .empresa-name { font-family: 'Crimson Pro', serif; font-size: 20px; font-weight: 600; color: var(--az); }
   .empresa-meta { font-size: 12px; color: var(--gray3); margin-top: 2px; }
   .empresa-alumnos { width: 100%; border-collapse: collapse; }
   .empresa-alumnos td { padding: 8px 14px; border-bottom: var(--border); font-size: 12px; }
@@ -738,7 +738,7 @@ window.addEventListener('unhandledrejection', function(e) {
        editar, borrar) se quedaba forzado en la misma fila que el nombre,
        provocando solapes de texto y botones. En móvil se apila debajo. */
     .empresa-card-header { flex-wrap: wrap; }
-    .empresa-card-header > div:last-child { flex: 1 1 100%; justify-content: flex-start; }
+    .empresa-card-header > div:last-child { flex: 1 1 100%; justify-content: center; }
   }
 
   @media (min-width: 641px) and (max-width: 900px) {
@@ -2427,7 +2427,7 @@ function renderTabla() {
         <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
           <button class="btn btn-sm btn-ghost" title="Editar datos personales del alumno" onclick="abrirPanelAlumno(${f.id})">✏️ Datos personales</button>
           <button class="btn btn-sm btn-secondary" title="Ver y gestionar estancias FEOE" onclick="abrirPanelAlumnoEstancias(${f.id})">📋 Estancias FEOE</button>
-          ${isAdmin()?`<button class="btn btn-sm btn-danger" title="Solicitar eliminación de este alumno y todas sus estancias" onclick="solicitarEliminar('alumno',${f.id},'${esc(f.apellidos+' '+f.nombre)}')">🗑</button>`:''}
+          ${canWrite()?`<button class="btn btn-sm btn-danger" title="${isAdmin()?'Borrar este alumno y todas sus estancias':'Solicitar eliminación de este alumno (requiere aprobación de un admin)'}" onclick="solicitarEliminar('alumno',${f.id},'${esc(f.apellidos+' '+f.nombre)}')">🗑</button>`:''}
         </div>
       </td>
     </tr>`;
@@ -2736,7 +2736,7 @@ function renderListaEstancias(alumnoId) {
               + '</button>'
               + '<button class="btn btn-secondary" style="padding:10px 16px;font-size:14px" onclick="nuevaVisitaRapida('+e.id+')">+ Nueva visita</button>'
               + (!e.deletePending
-                  ? '<button class="btn btn-ghost" style="padding:10px 16px;font-size:14px;color:var(--red)" onclick="solicitarEliminarEstancia('+e.id+')">🗑 Borrar</button>'
+                  ? '<button class="btn btn-ghost" style="padding:10px 16px;font-size:14px;color:var(--red)" onclick="solicitarEliminarEstancia('+e.id+')">🗑 '+(isAdmin()?'Borrar':'Solicitar borrado')+'</button>'
                   : '<span class="badge badge-pend">📋 Pendiente de autorizar</span>')
             + '</div>'
             : '')
@@ -3117,6 +3117,9 @@ function renderEmpresas() {
     }
 
     const estadoInfo = PROSPECCION_INFO[e.prospeccionEstado] || PROSPECCION_INFO.sin_contactar;
+    const telBtn = e.contactoTel
+      ? `<a href="tel:${esc(e.contactoTel)}" style="${btnBase}border:1.5px solid var(--az);background:var(--az-light);color:var(--az);text-decoration:none">📞 ${escHtml(e.contactoTel)}</a>`
+      : '';
 
     return `
     <div class="empresa-card">
@@ -3124,21 +3127,18 @@ function renderEmpresas() {
         <div style="display:flex;align-items:flex-start;gap:10px">
           <input type="checkbox" class="cb-empresa" data-id="${e.id}" ${seleccionEmpresas.has(e.id)?'checked':''} onchange="toggleSeleccionEmpresa(${e.id},this.checked)" style="margin-top:5px;width:16px;height:16px;flex-shrink:0;cursor:pointer">
           <div>
-          <div class="empresa-name">🏢 ${escHtml(e.nombre)}</div>
-          <div class="empresa-meta mono">${e.contactoTel ? escHtml(e.contactoTel) : '<span style="color:var(--gray4)">Sin teléfono</span>'}${e.sector ? ` · ${escHtml(e.sector)}` : ''}${e.direccion ? ` · ${escHtml(e.direccion)}` : '<span style="color:var(--red)"> · Sin dirección</span>'}</div>
-          <div class="empresa-meta" style="margin-top:3px">
-            ${e.contactoNombre ? `👤 ${escHtml(e.contactoNombre)}${e.contactoCargo?' ('+escHtml(e.contactoCargo)+')':''}` : ''}
-            <span style="margin-left:8px;font-weight:400;color:var(--gray4);font-size:11px" title="CIF/NIF">🆔 ${escHtml(formatCif(e.cif))}</span>
-          </div>
+          <div class="empresa-name" style="cursor:pointer" title="Ver ficha de la empresa" onclick="abrirPanelEmpresa(${e.id})">🏢 ${escHtml(e.nombre)}</div>
+          <div class="empresa-meta mono">${e.direccion ? escHtml(e.direccion) : '<span style="color:var(--red)">Sin dirección</span>'}</div>
           </div>
         </div>
-        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end">
-          ${mapaBadge}
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          ${telBtn}
           <button type="button" title="Gestionar prospección" style="${btnBase}border:1.5px solid ${estadoInfo.color};background:${estadoInfo.bg};color:${estadoInfo.color}" onclick="abrirModalProspeccion(${e.id})">${estadoInfo.icon} ${estadoInfo.label}</button>
           ${tieneEstanciaActiva ? `<span title="Tiene alumnado en estancia formativa este curso" style="font-size:26px;line-height:1">🧑‍🎓</span>` : ''}
           <button type="button" style="${btnBase}border:1.5px solid var(--az);background:var(--az-light);color:var(--az)" onclick="abrirModalEstanciasEmpresa(${e.id})">${ests.length} estancia${ests.length!==1?'s':''}</button>
+          ${mapaBadge}
           <button class="btn btn-secondary" style="padding:10px 16px;font-size:14px" onclick="abrirPanelEmpresa(${e.id})">✏️ Editar</button>
-          ${isAdmin() ? `<button class="btn btn-ghost" style="padding:10px 16px;font-size:14px;color:var(--red)" onclick="solicitarEliminar('empresa',${e.id},'${esc(e.nombre)}')">🗑 Borrar</button>` : ''}
+          ${canWrite() ? `<button class="btn btn-ghost" style="padding:10px 16px;font-size:14px;color:var(--red)" onclick="solicitarEliminar('empresa',${e.id},'${esc(e.nombre)}')">🗑 ${isAdmin()?'Borrar':'Solicitar borrado'}</button>` : ''}
         </div>
       </div>
     </div>
@@ -3963,6 +3963,19 @@ function solicitarEliminarEstancia(estanciaId) {
 }
 
 async function solicitarEliminar(tipo,refId,nombre) {
+  if (isAdmin()) {
+    confirmar('Eliminar '+tipo,'Se eliminará permanentemente "'+nombre+'"'+(tipo==='alumno'?' y todas sus estancias FEOE.':'.')+'\n\nEsta acción no se puede deshacer.',async()=>{
+      try {
+        if (tipo==='alumno') await Alumnado.delete(refId);
+        else if (tipo==='estancia') await Estancias.delete(refId);
+        else if (tipo==='empresa') await Empresas.delete(refId);
+        addHistorial('del','Eliminacion: '+tipo+' "'+nombre+'"');
+        toast(tipo.charAt(0).toUpperCase()+tipo.slice(1)+' eliminado','success');
+        await cargarDatos(); actualizarFiltros(); renderTabla(); renderEmpresas(); renderStats(); actualizarContadores();
+      } catch(err){toast('Error: '+err.message,'error');}
+    });
+    return;
+  }
   if(state.pendientes.find(p=>p.tipo===tipo&&p.refId===refId&&!p.resuelto)){toast('Ya hay una solicitud registrada para esto','warning');return;}
   confirmar('Solicitar eliminación','Se registrará la solicitud de eliminar "'+nombre+'".\n\nEl registro no se borra todavía: queda marcado y un administrador deberá autorizarlo.',async()=>{
     try {
@@ -3971,7 +3984,6 @@ async function solicitarEliminar(tipo,refId,nombre) {
       toast('Solicitud registrada. Pendiente de autorización.','warning');
       if(tipo==='estancia'){updateEstanciaLocal(refId,{deletePending:true});const ep=findEstancia(refId);if(ep?.alumnoId)renderListaEstancias(ep.alumnoId);}
       await cargarDatos(); actualizarContadores();
-      if(isAdmin()) switchTab('pendientes');
     } catch(err){toast('Error: '+err.message,'error');}
   });
 }
@@ -3989,14 +4001,31 @@ async function eliminarSeleccionados() {
   if(seleccion.size===0) return;
   const ids=[...seleccion];
   const nombres=ids.map(id=>{const a=state.alumnado.find(x=>x.id===id);return a?a.apellidos+', '+a.nombre:'#'+id;});
-  const msg='Se eliminaran '+ids.length+' alumno(s) y todas sus estancias FEOE.\n\n'+nombres.slice(0,5).join('\n')+(ids.length>5?'\n...y '+(ids.length-5)+' mas':'');
-  confirmar('Eliminar '+ids.length+' alumno(s)',msg,async()=>{
+  if (isAdmin()) {
+    const msg='Se eliminaran '+ids.length+' alumno(s) y todas sus estancias FEOE.\n\n'+nombres.slice(0,5).join('\n')+(ids.length>5?'\n...y '+(ids.length-5)+' mas':'');
+    confirmar('Eliminar '+ids.length+' alumno(s)',msg,async()=>{
+      try {
+        await Alumnado.bulkDelete(ids);
+        ids.forEach(id=>{const a=state.alumnado.find(x=>x.id===id);addHistorial('del','Eliminacion: '+(a?.apellidos||'')+' '+(a?.nombre||''));});
+        seleccion.clear(); actualizarBarraSeleccion();
+        await cargarDatos(); actualizarFiltros(); renderTabla(); renderStats(); actualizarContadores();
+        toast(ids.length+' alumno(s) eliminado(s)','success');
+      } catch(err){toast('Error: '+err.message,'error');}
+    });
+    return;
+  }
+  const msg='Se solicitará la eliminación de '+ids.length+' alumno(s). Quedarán marcados y un administrador deberá autorizarlos.\n\n'+nombres.slice(0,5).join('\n')+(ids.length>5?'\n...y '+(ids.length-5)+' mas':'');
+  confirmar('Solicitar eliminación de '+ids.length+' alumno(s)',msg,async()=>{
     try {
-      await Alumnado.bulkDelete(ids);
-      ids.forEach(id=>{const a=state.alumnado.find(x=>x.id===id);addHistorial('del','Eliminacion: '+(a?.apellidos||'')+' '+(a?.nombre||''));});
+      for (const id of ids) {
+        const a = state.alumnado.find(x=>x.id===id);
+        if (state.pendientes.find(p=>p.tipo==='alumno'&&p.refId===id&&!p.resuelto)) continue;
+        await Pendientes.create({tipo:'alumno', ref_id:id, nombre:(a?a.apellidos+' '+a.nombre:'#'+id)});
+        addHistorial('del','Solicitud eliminacion: alumno "'+(a?.apellidos||'')+' '+(a?.nombre||'')+'"');
+      }
       seleccion.clear(); actualizarBarraSeleccion();
-      await cargarDatos(); actualizarFiltros(); renderTabla(); renderStats(); actualizarContadores();
-      toast(ids.length+' alumno(s) eliminado(s)','success');
+      await cargarDatos(); actualizarContadores();
+      toast('Solicitudes registradas. Pendientes de autorización.','warning');
     } catch(err){toast('Error: '+err.message,'error');}
   });
 }
@@ -4068,7 +4097,7 @@ async function cargarDatos() {
     state.pendientes=pendientes.map(p=>({id:p.id,tipo:p.tipo,refId:p.ref_id,nombre:p.nombre,solicitante:p.solicitante,fecha:p.created_at,resuelto:!!p.resuelto,aprobado:p.aprobado}));
     state.historial=historial.map(h=>({id:h.id,tipo:h.tipo,texto:h.texto,usuario:h.usuario,fecha:h.created_at}));
     state.empresas.forEach(e=>{if(e.lat&&e.lon) geocacheMap[e.cif]={lat:e.lat,lon:e.lon};});
-    if(currentUser?.role==='admin'||currentUser?.role==='tutor'){try{const{users}=await Users.list();state.usuarios=users;}catch{state.usuarios=[];}}
+    if(currentUser?.role==='admin'||currentUser?.role==='tutor'||currentUser?.role==='profe'){try{const{users}=await Users.list();state.usuarios=users;}catch{state.usuarios=[];}}
     setSaveIndicator('saved'); actualizarFiltros(); renderTabla(); renderStats(); renderEmpresas(); actualizarContadores();
     poblarSelectorSupervisor();
   } catch(err){setSaveIndicator('error');toast('Error al cargar datos: '+err.message,'error');}
@@ -4083,13 +4112,13 @@ function poblarSelectorSupervisor() {
   if(cur) sel.value=cur;
 }
 
-// Docente que realiza la visita de seguimiento. admin/tutor pueden elegir cualquier
-// docente activo; profe solo ve su propio nombre (fijo, sin poder atribuir la visita
-// a otra persona).
+// Docente que realiza la visita de seguimiento. Cualquier rol profe o
+// superior puede elegir cualquier docente activo (incluido atribuírsela a
+// otro compañero).
 function poblarSelectorDocenteVisita(autorIdActual) {
   const sel = document.getElementById('seDocente');
   if (!sel) return;
-  const esGestor = currentUser?.role === 'admin' || currentUser?.role === 'tutor';
+  const esGestor = currentUser?.role === 'admin' || currentUser?.role === 'tutor' || currentUser?.role === 'profe';
   if (esGestor) {
     const docentes = (state.usuarios||[]).filter(u=>u.activo&&(u.role==='admin'||u.role==='tutor'||u.role==='profe'));
     sel.innerHTML = docentes.map(u=>'<option value="'+u.id+'" data-nombre="'+escHtml(u.nombre||u.username)+'">'+(u.nombre||u.username)+'</option>').join('');
@@ -4163,17 +4192,17 @@ function rolBadgeStyle(role) {
 const TABLA_ROLES = [
   ['Ver alumnado, empresas, estancias, mapa', '✅','✅','✅','✅'],
   ['Crear/editar alumnos, empresas, estancias, prospección, visitas', '❌','✅','✅','✅'],
-  ['Borrar alumno o estancia (directamente)', '❌','Solo solicitar','✅','✅'],
+  ['Borrar alumno o estancia (directamente)', '❌','Solo solicitar','Solo solicitar','✅'],
   ['Validar/aprobar seguimientos pendientes', '❌','❌','✅','✅'],
-  ['Autorizar/descartar solicitudes de eliminación de un profe', '❌','❌','❌','✅'],
+  ['Autorizar/descartar solicitudes de eliminación de un profe o tutor', '❌','❌','❌','✅'],
   ['Ver y gestionar la pestaña Pendientes', '❌','❌','❌','✅'],
   ['Ver y gestionar la pestaña Historial', '❌','❌','❌','✅'],
   ['Editar la nota de prospección de otro docente', '❌','❌','❌','❌ (nadie puede)'],
-  ['Atribuir una visita de seguimiento a otro docente', '❌','❌','✅','✅'],
-  ['Ver la lista de usuarios', '❌','❌','✅ (solo ver)','✅'],
+  ['Atribuir una visita de seguimiento a otro docente', '❌','✅','✅','✅'],
+  ['Ver la lista de usuarios', '❌','✅ (para atribuir visitas)','✅ (solo ver)','✅'],
   ['Crear/editar/borrar usuarios', '❌','❌','❌','✅'],
   ['Cambiar la contraseña propia', '—','✅','✅','✅'],
-  ['Añadir entradas manuales al historial', '❌','❌','✅','✅'],
+  ['Añadir entradas manuales al historial', '❌','✅','✅','✅'],
   ['Borrar entradas del historial / vaciarlo', '❌','❌','❌','✅'],
   ['Copia de seguridad (exportar/restaurar)', '❌','❌','❌','✅'],
   ['Borrar todos los datos', '❌','❌','❌','✅'],
